@@ -9,6 +9,11 @@ import {
   Filter,
   HelpCircle,
   Download,
+  ChevronDown,
+  Table2,
+  FileJson,
+  Import,
+  RefreshCw,
   Trash2,
   X,
   Info,
@@ -86,6 +91,16 @@ import {
   Bar,
 } from "recharts";
 
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "./components/ui/dropdown-menu";
+
+
 /* ===========================================================
    Types / Data Model
    =========================================================== */
@@ -159,6 +174,15 @@ const STR = {
     newArea: "Neuer Bereich",
     newLog: "Neue Anfrage protokollieren",
     clearFilters: "Filter zurücksetzen",
+
+    // 🔽 neu:
+    data: "Daten",
+    csvExport: "CSV exportieren",
+    jsonExport: "JSON exportieren",
+    jsonImport: "JSON importieren",
+    demoLoad: "Demo-Daten laden",
+    demoClear: "Demo-Daten löschen",
+
   },
   filters: {
     team: "Team",
@@ -958,7 +982,9 @@ export default function WorkRequestPlannerAppUX() {
   const [fltTo, setFltTo] = React.useState<string>("");
   const [fltTag, setFltTag] = React.useState<string>("");
   const [advancedOpen, setAdvancedOpen] = React.useState(false);
-
+  
+  const [openImportDialog, setOpenImportDialog] = useState(false);
+  
   const [openTopicDialog, setOpenTopicDialog] = React.useState(false);
   const [openTeamDialog, setOpenTeamDialog] = React.useState(false);
   const [openAreaDialog, setOpenAreaDialog] = React.useState(false);
@@ -1449,16 +1475,7 @@ export default function WorkRequestPlannerAppUX() {
                         <Import className="h-4 w-4 mr-2" />
                         {STR.actions.jsonImport}
                       </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={loadDemo}>
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                        {STR.actions.demoLoad}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={clearDemo}>
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        {STR.actions.demoClear}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
+                      </DropdownMenuContent>
                   </DropdownMenu>
 
                   {/* Shortcuts-Hilfe */}
@@ -1630,7 +1647,6 @@ export default function WorkRequestPlannerAppUX() {
             </div>
           </div>
         </header>
-
 
       {/* Main */}
       <main className="flex-1 w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
@@ -1931,6 +1947,68 @@ export default function WorkRequestPlannerAppUX() {
                       d.date.getMonth() === calendarCursor.getMonth();
                     const items = d.items.slice(0, 3);
                     const extra = d.items.length - items.length;
+
+                    // JSON-Export des kompletten States
+                    const exportJSON = () => {
+                      try {
+                        const payload = JSON.stringify(state, null, 2);
+                        const blob = new Blob([payload], { type: "application/json" });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = "work-request-planner-state.json";
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      } catch (e) {
+                        console.error("JSON-Export fehlgeschlagen", e);
+                      }
+                    };
+
+                    // CSV-Export nur für Topics
+                    const exportCSV = () => {
+                      try {
+                        const header = [
+                          "id",
+                          "teamId",
+                          "title",
+                          "description",
+                          "areaIds",
+                          "cadence",
+                          "startDate",
+                          "dueStrategy",
+                          "dueOffsetDays",
+                          "expectedDeliverable",
+                          "priority",
+                          "status",
+                          "tags",
+                          "lastRequestDate",
+                          "nextRequestDate",
+                        ];
+
+                        const rows = state.topics.map((t) =>
+                          header
+                            .map((key) => {
+                              const value = (t as any)[key];
+                              if (value === null || value === undefined) return "";
+                              // einfache CSV-Escapes
+                              const s = String(value).replace(/"/g, '""');
+                              return `"${s}"`;
+                            })
+                            .join(";")
+                        );
+
+                        const csv = [header.join(";"), ...rows].join("\n");
+                        const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = "work-request-planner-topics.csv";
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      } catch (e) {
+                        console.error("CSV-Export fehlgeschlagen", e);
+                      }
+                    };
 
                     return (
                       <div
