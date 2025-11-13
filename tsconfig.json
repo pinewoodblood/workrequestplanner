@@ -7,22 +7,15 @@
     "skipLibCheck": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-
     "strict": false,
-    "noImplicitAny": false,
-
+    "forceConsistentCasingInFileNames": true,
     "module": "ESNext",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "react-jsx",
-
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"]
-    },
-
-    "types": ["vite/client"]
+    "noEmit": true,
+    "jsx": "react-jsx"
+    // 👇 WICHTIG: HIER KEIN "types": ["vite/client"] MEHR
   },
-  "include": ["src"]
+  "include": ["src", "vite-env.d.ts"]
 }

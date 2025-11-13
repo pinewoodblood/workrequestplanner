@@ -1,7 +1,7 @@
 "use client";
 
 //import * as React from "react";
-import React, { useState, useReducer, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useReducer, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   CalendarClock,
   CalendarDays,
@@ -305,7 +305,8 @@ type Action =
   | { type: "ADD_LOG"; log: RequestLog }
   | { type: "DELETE_LOG"; id: string }
   | { type: "RECALC_DATES" }
-  | { type: "LOAD_STATE"; payload: State };
+  | { type: "LOAD_STATE"; payload: State }
+  | { type: "IMPORT_STATE"; payload: State }
 
   const emptyState: State = { teams: [], areas: [], topics: [], logs: [] };
 
@@ -449,6 +450,14 @@ function reducer(state: State, action: Action): State {
       };
     case "LOAD_STATE":
       return action.payload;
+    case "IMPORT_STATE": {
+        // komplette State-Übernahme; wenn du willst, kannst du hier auch merge-Logik einbauen
+        const next = {
+          ...state,
+          ...action.payload,
+        };
+      return next;
+    }
     default:
       return state;
   }
@@ -1472,11 +1481,75 @@ export default function WorkRequestPlannerAppUX() {
         }
       };
 
+        // --- JSON-Import: verstecktes File-Input + Handler -----------------
+  const jsonFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleJsonImportClick = () => {
+    jsonFileInputRef.current?.click();
+  };
+
+  const handleJsonFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const text = String(reader.result || "");
+        const parsed = JSON.parse(text);
+
+        // sehr leichte Schema-Prüfung
+        if (
+          !parsed ||
+          typeof parsed !== "object" ||
+          !Array.isArray(parsed.teams) ||
+          !Array.isArray(parsed.areas) ||
+          !Array.isArray(parsed.topics) ||
+          !Array.isArray(parsed.logs)
+        ) {
+          toast.error("Ungültiges JSON. Die Datei entspricht nicht der erwarteten Struktur.");
+          return;
+        }
+
+        // optional: Nachfrage, ob wirklich alles ersetzt werden soll
+        if (
+          !window.confirm(
+            "Bestehende Daten durch die importierte JSON-Datei ersetzen?"
+          )
+        ) {
+          return;
+        }
+
+        dispatch({ type: "IMPORT_STATE", payload: parsed });
+        toast.error("Daten importiert" );
+      } catch (err) {
+        console.error("JSON-Import-Fehler", err);
+        toast("Import fehlgeschlagen.Die JSON-Datei konnte nicht gelesen werden.");
+      } finally {
+        // Input resetten, damit dieselbe Datei erneut wählbar ist
+        if (jsonFileInputRef.current) {
+          jsonFileInputRef.current.value = "";
+        }
+      }
+    };
+    reader.onerror = () => {
+      toast.error("Lesefehler. Die Datei konnte nicht gelesen werden.");
+    };
+
+    reader.readAsText(file, "utf-8");
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 text-slate-900 flex flex-col">
       <Toaster richColors closeButton />
-
+      {/* Hidden File Input für JSON-Import */}
+      <input
+        ref={jsonFileInputRef}
+        type="file"
+        accept="application/json"
+        className="hidden"
+        onChange={handleJsonFileChange}
+      />
       {/* Header */}
         <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="w-full px-4 sm:px-6 lg:px-8 py-4">
@@ -1532,7 +1605,7 @@ export default function WorkRequestPlannerAppUX() {
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuLabel>Import</DropdownMenuLabel>
-                      <DropdownMenuItem onClick={() => setOpenImportDialog(true)}>
+                      <DropdownMenuItem onClick={handleJsonImportClick}>
                         <Import className="h-4 w-4 mr-2" />
                         {STR.actions.jsonImport}
                       </DropdownMenuItem>
