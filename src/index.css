@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* App-Theme (helle, klare Blau-Akzente) */
+@layer base {
+  :root{
+    --background: 0 0% 100%;
+    --foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 97%;
+    --muted-foreground: 215 16% 46%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 48% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 48% 11%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+
+    /* Primär-/Akzentfarben (Blau) */
+    --primary: 213 90% 42%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 48% 11%;
+    --accent: 213 100% 96%;
+    --accent-foreground: 213 70% 22%;
+
+    --destructive: 0 78% 56%;
+    --destructive-foreground: 0 0% 100%;
+
+    --ring: 213 90% 42%;
+    --radius: .8rem;
+
+    /* Seite */
+    --page-start: 210 40% 99%;
+    --page-end: 0 0% 100%;
+  }
+
+  /* Grundfarben direkt setzen */
+  *,::before,::after{ border-color: hsl(var(--border)); }
+  body{
+    background: linear-gradient(180deg, hsl(var(--page-start)) 0%, hsl(var(--page-end)) 60%);
+    color: hsl(var(--foreground));
+  }
+}
+
+/* Kleine Helfer */
+@layer utilities{
+  .app-container{ @apply w-full px-4 sm:px-6 lg:px-8; }
+  .app-section{ @apply max-w-none w-full; } /* Full width */
+  .card-soft { @apply rounded-2xl border bg-card shadow-sm; }
+  .sticky-header { @apply sticky top-0 z-20 backdrop-blur bg-background/80 border-b; }
+}
