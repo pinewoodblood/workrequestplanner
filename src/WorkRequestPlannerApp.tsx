@@ -1391,237 +1391,246 @@ export default function WorkRequestPlannerAppUX() {
       <Toaster richColors closeButton />
 
       {/* Header */}
-      <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-       <div className="w-full px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <h1 className="text-3xl font-semibold tracking-tight">
-                  {STR.appTitle}
-                </h1>
-                <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs bg-accent text-accent-foreground border">
-                  localStorage
-                </span>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button onClick={openNewTopic}>
-                  <Plus className="h-4 w-4 mr-1" />
-                  {STR.actions.newTopic}
-                </Button>
-                <Button variant="outline" onClick={beginNewTeam}>
-                  <Plus className="h-4 w-4 mr-1" />
-                  {STR.actions.newTeam}
-                </Button>
-                <Button variant="outline" onClick={beginNewArea}>
-                  <Plus className="h-4 w-4 mr-1" />
-                  {STR.actions.newArea}
-                </Button>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      aria-label="Shortcuts"
-                    >
-                      <HelpCircle className="h-5 w-5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    / Suche · n Neues Thema · t Team · b Bereich
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-            </div>
-
-            <p className="text-sm text-muted-foreground">
-              {STR.subtitle}
-            </p>
-
-            {/* Toolbar / Filter */}
-            <Card>
-              <CardContent className="py-4 space-y-3">
-                <div className="flex flex-col md:flex-row md:items-center gap-2">
-                  <div className="flex items-center gap-2 md:w-96 w-full">
-                    <Input
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      placeholder={STR.searchPlaceholder}
-                      aria-label="Suche"
-                    />
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex items-center gap-2">
-                      <Label className="text-xs">{STR.filters.team}</Label>
-                      <Select
-                        value={fltTeam}
-                        onValueChange={setFltTeam}
-                      >
-                        <SelectTrigger className="w-40">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Alle</SelectItem>
-                          {state.teams.map((t) => (
-                            <SelectItem key={t.id} value={t.id}>
-                              {t.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Label className="text-xs">{STR.filters.area}</Label>
-                      <Select
-                        value={fltArea}
-                        onValueChange={setFltArea}
-                      >
-                        <SelectTrigger className="w-40">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Alle</SelectItem>
-                          {state.areas.map((a) => (
-                            <SelectItem key={a.id} value={a.id}>
-                              {a.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Label className="text-xs">
-                        {STR.filters.status}
-                      </Label>
-                      <Select
-                        value={fltStatus}
-                        onValueChange={setFltStatus}
-                      >
-                        <SelectTrigger className="w-32">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Alle</SelectItem>
-                          <SelectItem value="planned">planned</SelectItem>
-                          <SelectItem value="active">active</SelectItem>
-                          <SelectItem value="blocked">blocked</SelectItem>
-                          <SelectItem value="done">done</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="ml-auto flex items-center gap-2">
-                    <Button variant="outline" onClick={clearFilters}>
-                      <Filter className="h-4 w-4 mr-1" />
-                      {STR.actions.clearFilters}
-                    </Button>
-                  </div>
+        <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="w-full px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <h1 className="text-3xl font-semibold tracking-tight">
+                    {STR.appTitle}
+                  </h1>
+                  <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs bg-accent text-accent-foreground border">
+                    localStorage
+                  </span>
                 </div>
 
-                <Collapsible
-                  open={advancedOpen}
-                  onOpenChange={setAdvancedOpen}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs uppercase tracking-wide text-muted-foreground">
-                      {STR.filters.more}
-                    </span>
-                    <CollapsibleTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        {advancedOpen ? "Weniger" : "Mehr"} Filter
+                {/* Aktionen rechts im Header */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Neues Thema */}
+                  <Button onClick={openNewTopic}>
+                    <Plus className="h-4 w-4 mr-1" />
+                    {STR.actions.newTopic}
+                  </Button>
+
+                  {/* Neues Team */}
+                  <Button variant="outline" onClick={beginNewTeam}>
+                    <Plus className="h-4 w-4 mr-1" />
+                    {STR.actions.newTeam}
+                  </Button>
+
+                  {/* Neuer Bereich */}
+                  <Button variant="outline" onClick={beginNewArea}>
+                    <Plus className="h-4 w-4 mr-1" />
+                    {STR.actions.newArea}
+                  </Button>
+
+                  {/* 🔽 Daten-Menü: Export / Import / Demo */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline">
+                        <Download className="h-4 w-4 mr-1" />
+                        {STR.actions.data}
+                        <ChevronDown className="h-4 w-4 ml-1" />
                       </Button>
-                    </CollapsibleTrigger>
-                  </div>
-                  <CollapsibleContent className="mt-3">
-                    <div className="grid md:grid-cols-6 grid-cols-2 gap-2">
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>Export</DropdownMenuLabel>
+                      <DropdownMenuItem onClick={exportCSV}>
+                        <Table2 className="h-4 w-4 mr-2" />
+                        {STR.actions.csvExport}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={exportJSON}>
+                        <FileJson className="h-4 w-4 mr-2" />
+                        {STR.actions.jsonExport}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuLabel>Import</DropdownMenuLabel>
+                      <DropdownMenuItem onClick={() => setOpenImportDialog(true)}>
+                        <Import className="h-4 w-4 mr-2" />
+                        {STR.actions.jsonImport}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={loadDemo}>
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        {STR.actions.demoLoad}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={clearDemo}>
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        {STR.actions.demoClear}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  {/* Shortcuts-Hilfe */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        aria-label="Shortcuts"
+                      >
+                        <HelpCircle className="h-5 w-5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      / Suche · n Neues Thema · t Team · b Bereich
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              </div>
+
+              <p className="text-sm text-muted-foreground">
+                {STR.subtitle}
+              </p>
+
+              {/* Toolbar / Filter */}
+              <Card>
+                <CardContent className="py-4 space-y-3">
+                  <div className="flex flex-col md:flex-row md:items-center gap-2">
+                    <div className="flex items-center gap-2 md:w-96 w-full">
+                      <Input
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder={STR.searchPlaceholder}
+                        aria-label="Suche"
+                      />
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
                       <div className="flex items-center gap-2">
-                        <Label className="text-xs">
-                          {STR.filters.cadence}
-                        </Label>
-                        <Select
-                          value={fltCadence}
-                          onValueChange={setFltCadence}
-                        >
-                          <SelectTrigger className="w-36">
+                        <Label className="text-xs">{STR.filters.team}</Label>
+                        <Select value={fltTeam} onValueChange={setFltTeam}>
+                          <SelectTrigger className="w-40">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="all">Alle</SelectItem>
-                            <SelectItem value="one-off">
-                              one-off
-                            </SelectItem>
-                            <SelectItem value="weekly">weekly</SelectItem>
-                            <SelectItem value="monthly">
-                              monthly
-                            </SelectItem>
-                            <SelectItem value="quarterly">
-                              quarterly
-                            </SelectItem>
-                            <SelectItem value="yearly">yearly</SelectItem>
+                            {state.teams.map((t) => (
+                              <SelectItem key={t.id} value={t.id}>
+                                {t.name}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Label className="text-xs">
-                          {STR.filters.priority}
-                        </Label>
-                        <Select
-                          value={fltPriority}
-                          onValueChange={setFltPriority}
-                        >
+                        <Label className="text-xs">{STR.filters.area}</Label>
+                        <Select value={fltArea} onValueChange={setFltArea}>
+                          <SelectTrigger className="w-40">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Alle</SelectItem>
+                            {state.areas.map((a) => (
+                              <SelectItem key={a.id} value={a.id}>
+                                {a.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs">{STR.filters.status}</Label>
+                        <Select value={fltStatus} onValueChange={setFltStatus}>
                           <SelectTrigger className="w-32">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="all">Alle</SelectItem>
-                            <SelectItem value="low">low</SelectItem>
-                            <SelectItem value="medium">
-                              medium
-                            </SelectItem>
-                            <SelectItem value="high">high</SelectItem>
+                            <SelectItem value="planned">planned</SelectItem>
+                            <SelectItem value="active">active</SelectItem>
+                            <SelectItem value="blocked">blocked</SelectItem>
+                            <SelectItem value="done">done</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Label className="text-xs">
-                          {STR.filters.dateFrom}
-                        </Label>
-                        <Input
-                          type="date"
-                          className="w-40"
-                          value={fltFrom}
-                          onChange={(e) => setFltFrom(e.target.value)}
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Label className="text-xs">
-                          {STR.filters.dateTo}
-                        </Label>
-                        <Input
-                          type="date"
-                          className="w-40"
-                          value={fltTo}
-                          onChange={(e) => setFltTo(e.target.value)}
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Label className="text-xs">
-                          {STR.filters.tag}
-                        </Label>
-                        <Input
-                          className="w-40"
-                          value={fltTag}
-                          onChange={(e) => setFltTag(e.target.value)}
-                          placeholder="z. B. audit"
-                        />
-                      </div>
                     </div>
-                  </CollapsibleContent>
-                </Collapsible>
-              </CardContent>
-            </Card>
+                    <div className="ml-auto flex items-center gap-2">
+                      <Button variant="outline" onClick={clearFilters}>
+                        <Filter className="h-4 w-4 mr-1" />
+                        {STR.actions.clearFilters}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                        {STR.filters.more}
+                      </span>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          {advancedOpen ? "Weniger" : "Mehr"} Filter
+                        </Button>
+                      </CollapsibleTrigger>
+                    </div>
+                    <CollapsibleContent className="mt-3">
+                      <div className="grid md:grid-cols-6 grid-cols-2 gap-2">
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs">{STR.filters.cadence}</Label>
+                          <Select value={fltCadence} onValueChange={setFltCadence}>
+                            <SelectTrigger className="w-36">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">Alle</SelectItem>
+                              <SelectItem value="one-off">one-off</SelectItem>
+                              <SelectItem value="weekly">weekly</SelectItem>
+                              <SelectItem value="monthly">monthly</SelectItem>
+                              <SelectItem value="quarterly">quarterly</SelectItem>
+                              <SelectItem value="yearly">yearly</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs">{STR.filters.priority}</Label>
+                          <Select value={fltPriority} onValueChange={setFltPriority}>
+                            <SelectTrigger className="w-32">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">Alle</SelectItem>
+                              <SelectItem value="low">low</SelectItem>
+                              <SelectItem value="medium">medium</SelectItem>
+                              <SelectItem value="high">high</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs">{STR.filters.dateFrom}</Label>
+                          <Input
+                            type="date"
+                            className="w-40"
+                            value={fltFrom}
+                            onChange={(e) => setFltFrom(e.target.value)}
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs">{STR.filters.dateTo}</Label>
+                          <Input
+                            type="date"
+                            className="w-40"
+                            value={fltTo}
+                            onChange={(e) => setFltTo(e.target.value)}
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs">{STR.filters.tag}</Label>
+                          <Input
+                            className="w-40"
+                            value={fltTag}
+                            onChange={(e) => setFltTag(e.target.value)}
+                            placeholder="z. B. audit"
+                          />
+                        </div>
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                </CardContent>
+              </Card>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
+
 
       {/* Main */}
       <main className="flex-1 w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
