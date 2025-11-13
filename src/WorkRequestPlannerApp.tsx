@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import React, { useState, useReducer, useEffect, useMemo, useCallback } from "react";
 import {
   CalendarClock,
   CalendarDays,
@@ -1411,6 +1412,66 @@ export default function WorkRequestPlannerAppUX() {
 
   const hasAnyData =
     state.teams.length || state.areas.length || state.topics.length;
+
+      const exportJSON = () => {
+        try {
+          const payload = JSON.stringify(state, null, 2);
+          const blob = new Blob([payload], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "work-request-planner-state.json";
+          a.click();
+          URL.revokeObjectURL(url);
+        } catch (e) {
+          console.error("JSON-Export fehlgeschlagen", e);
+        }
+      };
+    
+      const exportCSV = () => {
+        try {
+          const header = [
+            "id",
+            "teamId",
+            "title",
+            "description",
+            "areaIds",
+            "cadence",
+            "startDate",
+            "dueStrategy",
+            "dueOffsetDays",
+            "expectedDeliverable",
+            "priority",
+            "status",
+            "tags",
+            "lastRequestDate",
+            "nextRequestDate",
+          ];
+    
+          const rows = state.topics.map((t) =>
+            header
+              .map((key) => {
+                const value = (t as any)[key];
+                if (value === null || value === undefined) return "";
+                const s = String(value).replace(/"/g, '""');
+                return `"${s}"`;
+              })
+              .join(";")
+          );
+    
+          const csv = [header.join(";"), ...rows].join("\n");
+          const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "work-request-planner-topics.csv";
+          a.click();
+          URL.revokeObjectURL(url);
+        } catch (e) {
+          console.error("CSV-Export fehlgeschlagen", e);
+        }
+      };
+
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 text-slate-900 flex flex-col">
