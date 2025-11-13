@@ -22,35 +22,35 @@ import {
 } from "lucide-react";
 import { Toaster, toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "./components/ui/button";
 import {
   Card,
   CardHeader,
   CardTitle,
   CardDescription,
   CardContent,
-} from "@/components/ui/card";
+} from "./components/ui/card";
 import {
   Tabs,
   TabsList,
   TabsTrigger,
   TabsContent,
-} from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+} from "./components/ui/tabs";
+import { Badge } from "./components/ui/badge";
+import { Input } from "./components/ui/input";
+import { Label } from "./components/ui/label";
 import {
   Select,
   SelectTrigger,
   SelectValue,
   SelectContent,
   SelectItem,
-} from "@/components/ui/select";
+} from "./components/ui/select";
 import {
   Tooltip,
   TooltipTrigger,
   TooltipContent,
-} from "@/components/ui/tooltip";
+} from "./components/ui/tooltip";
 import {
   Dialog,
   DialogContent,
@@ -58,7 +58,7 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "@/components/ui/dialog";
+} from "./components/ui/dialog";
 import {
   Table,
   TableHeader,
@@ -67,19 +67,19 @@ import {
   TableBody,
   TableCell,
   TableCaption,
-} from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox";
+} from "./components/ui/table";
+import { Checkbox } from "./components/ui/checkbox";
 import {
   Collapsible,
   CollapsibleTrigger,
   CollapsibleContent,
-} from "@/components/ui/collapsible";
+} from "./components/ui/collapsible";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
-} from "@/components/ui/sheet";
+} from "./components/ui/sheet";
 
 import {
   ResponsiveContainer,
