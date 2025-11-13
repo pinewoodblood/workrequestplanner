@@ -1,6 +1,6 @@
 import * as React from "react";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
-import { cn } from "@/lib/utils";
+import { cn } from "../../lib/utils";
 
 /** Root */
 /** Root – triggert beim Tab-Wechsel ein Resize für Recharts */

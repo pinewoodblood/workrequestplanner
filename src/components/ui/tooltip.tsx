@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
-import { cn } from "@/lib/utils";
+import { cn } from "../../lib/utils";
 
 /** Provider mit sinnvollen Defaults (kann mehrfach in der Baumstruktur verwendet werden) */
 function TooltipProvider({
