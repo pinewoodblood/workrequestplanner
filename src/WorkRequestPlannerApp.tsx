@@ -101,6 +101,7 @@ import {
   DropdownMenuSeparator,
 } from "./components/ui/dropdown-menu";
 
+import { dataStore } from "./lib/dataStore";
 
 /* ===========================================================
    Types / Data Model
@@ -292,7 +293,16 @@ type State = {
   logs: RequestLog[];
 };
 
+interface AppState {
+  teams: Team[];
+  areas: Area[];
+  topics: Topic[];
+  logs: RequestLog[];
+}
+
 type Action =
+  | { type: "LOAD_ALL_FROM_BACKEND"; payload: AppState }
+  | { type: "RESET_FROM_REMOTE"; payload: AppState }
   | { type: "ADD_TEAM"; team: Team }
   | { type: "UPDATE_TEAM"; team: Team }
   | { type: "DELETE_TEAM"; id: string }
@@ -305,8 +315,8 @@ type Action =
   | { type: "ADD_LOG"; log: RequestLog }
   | { type: "DELETE_LOG"; id: string }
   | { type: "RECALC_DATES" }
-  | { type: "LOAD_STATE"; payload: State }
-  | { type: "IMPORT_STATE"; payload: State }
+  | { type: "IMPORT_STATE"; payload: AppState };
+
 
   const emptyState: State = { teams: [], areas: [], topics: [], logs: [] };
 
@@ -316,7 +326,7 @@ type Action =
    * - LEGACY_KEYS: hier trägst du die alten Keys ein, unter denen früher gespeichert wurde.
    *   -> Falls du andere alte Keys hattest, hier ergänzen!
    */
-  const PRIMARY_KEY = "work-request-planner:v1";
+  
   const LEGACY_KEYS = [
     "work-request-planner:v2",      // frühere Version
     "work-request-planner",         // ggf. ganz alte Variante
@@ -331,49 +341,15 @@ type Action =
       logs: Array.isArray(raw?.logs) ? raw.logs : [],
     };
     return s;
-  }
-  
-  function loadInitialState(): State {
-    // 1. Versuche zuerst den neuen Key
-    try {
-      const raw = localStorage.getItem(PRIMARY_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        return normalizeState(parsed);
-      }
-    } catch (e) {
-      console.warn("Konnte State aus PRIMARY_KEY nicht lesen:", e);
-    }
-  
-    // 2. Fallback: alte Keys durchgehen, ersten gültigen nehmen und direkt migrieren
-    for (const legacyKey of LEGACY_KEYS) {
-      try {
-        const rawLegacy = localStorage.getItem(legacyKey);
-        if (!rawLegacy) continue;
-  
-        const parsedLegacy = JSON.parse(rawLegacy);
-        const state = normalizeState(parsedLegacy);
-  
-        // Sofort unter dem neuen Key speichern (Migration)
-        try {
-          localStorage.setItem(PRIMARY_KEY, JSON.stringify(state));
-          console.info("State von Legacy-Key migriert:", legacyKey, "→", PRIMARY_KEY);
-        } catch (e) {
-          console.warn("Konnte migrierten State nicht unter PRIMARY_KEY speichern:", e);
-        }
-  
-        return state;
-      } catch (e) {
-        console.warn("Fehler beim Lesen von Legacy-Key", legacyKey, e);
-      }
-    }
-  
-    // 3. Nichts gefunden → leeren State verwenden
-    return emptyState;
   }  
 
-function reducer(state: State, action: Action): State {
+function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
+    case "RESET_FROM_REMOTE":
+      return {
+        ...state,
+        ...action.payload, // { teams, areas, topics, logs }
+      };    
     case "ADD_TEAM":
       return { ...state, teams: [...state.teams, action.team] };
     case "UPDATE_TEAM":
@@ -448,8 +424,6 @@ function reducer(state: State, action: Action): State {
             : t.nextRequestDate,
         })),
       };
-    case "LOAD_STATE":
-      return action.payload;
     case "IMPORT_STATE": {
         // komplette State-Übernahme; wenn du willst, kannst du hier auch merge-Logik einbauen
         const next = {
@@ -648,47 +622,62 @@ interface DataTableProps<T> {
    Forms
    =========================================================== */
 
-function TopicForm({
-  draft,
-  setDraft,
-  teams,
-  areas,
-}: {
+// ---------------- TopicForm ----------------
+
+type TopicFormProps = {
   draft: Partial<Topic>;
-  setDraft: (t: Partial<Topic>) => void;
+  setDraft: (draft: Partial<Topic>) => void;
   teams: Team[];
   areas: Area[];
-}) {
-  const areaIds = (draft.areaIds || "")
+};
+
+function TopicForm({ draft, setDraft, teams, areas }: TopicFormProps) {
+  // Hilfsfunktion: Liste von Area-IDs <-> CSV-String
+  const selectedAreaIds: string[] = (draft.areaIds ?? "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
 
-  function toggleArea(id: string) {
-    const set = new Set(areaIds);
-    if (set.has(id)) set.delete(id);
-    else set.add(id);
-    setDraft({
-      ...draft,
-      areaIds: Array.from(set).join(","),
-    });
-  }
+  const toggleArea = (areaId: string) => {
+    const set = new Set(selectedAreaIds);
+    if (set.has(areaId)) {
+      set.delete(areaId);
+    } else {
+      set.add(areaId);
+    }
+    const csv = Array.from(set).join(",");
+    setDraft({ ...draft, areaIds: csv });
+  };
 
   return (
-    <div className="grid gap-3 max-h-[60vh] overflow-y-auto pr-1">
+    <div className="grid gap-4">
+      {/* Titel */}
       <div className="grid gap-2">
-        <Label>Titel*</Label>
+        <Label htmlFor="topic-title">Titel*</Label>
         <Input
-          value={draft.title || ""}
-          onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-          placeholder="z. B. Monatsreport Fachbereich X"
+          id="topic-title"
+          value={draft.title ?? ""}
+          onChange={(e) =>
+            setDraft({
+              ...draft,
+              title: e.target.value,
+            })
+          }
+          placeholder="z. B. Quartalsreporting Risiko"
         />
       </div>
+
+      {/* Team */}
       <div className="grid gap-2">
         <Label>Team*</Label>
         <Select
-          value={draft.teamId || ""}
-          onValueChange={(v) => setDraft({ ...draft, teamId: v })}
+          value={draft.teamId ?? ""}
+          onValueChange={(value) =>
+            setDraft({
+              ...draft,
+              teamId: value,
+            })
+          }
         >
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Team wählen" />
@@ -702,6 +691,8 @@ function TopicForm({
           </SelectContent>
         </Select>
       </div>
+
+      {/* Bereiche (Mehrfachauswahl) */}
       <div className="grid gap-2">
         <Label>Bereiche (optional, mehrere möglich)</Label>
         {areas.length === 0 ? (
@@ -710,70 +701,148 @@ function TopicForm({
           </p>
         ) : (
           <div className="flex flex-wrap gap-2">
-            {areas.map((a) => (
-              <button
-                key={a.id}
-                type="button"
-                onClick={() => toggleArea(a.id)}
-                className={`px-2 py-1 text-xs rounded-full border ${
-                  areaIds.includes(a.id)
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-muted text-foreground"
-                }`}
-              >
-                {a.name}
-              </button>
-            ))}
+            {areas.map((a) => {
+              const checked = selectedAreaIds.includes(a.id);
+              return (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => toggleArea(a.id)}
+                  className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs ${
+                    checked
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background text-foreground hover:bg-muted"
+                  }`}
+                >
+                  <span>{a.name}</span>
+                  {checked && (
+                    <span className="text-[10px] uppercase tracking-wide">
+                      aktiv
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
-      <div className="grid md:grid-cols-2 gap-3">
+
+      {/* Fälligkeit / Cadence */}
+      <div className="grid md:grid-cols-3 gap-3">
         <div className="grid gap-2">
-          <Label>Startdatum (optional)</Label>
+          <Label>Startdatum</Label>
           <Input
             type="date"
-            value={draft.startDate || ""}
-            onChange={(e) => setDraft({ ...draft, startDate: e.target.value })}
+            value={draft.startDate ?? ""}
+            onChange={(e) =>
+              setDraft({
+                ...draft,
+                startDate: e.target.value || undefined,
+              })
+            }
           />
         </div>
+
         <div className="grid gap-2">
           <Label>Frequenz</Label>
           <Select
-            value={draft.cadence || ""}
-            onValueChange={(v) =>
-              setDraft({ ...draft, cadence: v as Cadence })
+            value={draft.cadence ?? ""}
+            onValueChange={(value) =>
+              setDraft({
+                ...draft,
+                cadence: value as Cadence,
+              })
             }
           >
             <SelectTrigger className="w-full">
               <SelectValue placeholder="optional" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="one-off">einmalig</SelectItem>
-              <SelectItem value="weekly">wöchentlich</SelectItem>
-              <SelectItem value="monthly">monatlich</SelectItem>
-              <SelectItem value="quarterly">quartalsweise</SelectItem>
-              <SelectItem value="yearly">jährlich</SelectItem>
+              <SelectItem value="one-off">one-off</SelectItem>
+              <SelectItem value="weekly">weekly</SelectItem>
+              <SelectItem value="monthly">monthly</SelectItem>
+              <SelectItem value="quarterly">quarterly</SelectItem>
+              <SelectItem value="yearly">yearly</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="grid gap-2">
+          <Label>Fälligkeitsstrategie</Label>
+          <Select
+            value={draft.dueStrategy ?? ""}
+            onValueChange={(value) =>
+              setDraft({
+                ...draft,
+                dueStrategy: value as Topic["dueStrategy"],
+              })
+            }
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Standard" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="fixed-date">fixes Datum</SelectItem>
+              <SelectItem value="offset-from-start">
+                Offset ab Start
+              </SelectItem>
+              <SelectItem value="offset-from-last">
+                Offset ab letzter Anfrage
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
+
+      {/* Optional: Offset-Tage */}
       <div className="grid gap-2">
-        <Label>Erwartetes Deliverable</Label>
+        <Label>Offset (Tage, optional)</Label>
         <Input
-          value={draft.expectedDeliverable || ""}
-          onChange={(e) =>
-            setDraft({ ...draft, expectedDeliverable: e.target.value })
+          type="number"
+          value={
+            typeof draft.dueOffsetDays === "number"
+              ? String(draft.dueOffsetDays)
+              : ""
           }
-          placeholder="z. B. Excel-Report, Entscheidungsvorlage…"
+          onChange={(e) =>
+            setDraft({
+              ...draft,
+              dueOffsetDays:
+                e.target.value === ""
+                  ? undefined
+                  : Number(e.target.value),
+            })
+          }
+          placeholder="z. B. 7"
         />
       </div>
-      <div className="grid md:grid-cols-3 gap-3">
+
+      {/* Ergebnis / Beschreibung */}
+      <div className="grid gap-2">
+        <Label>Erwartetes Ergebnis / Deliverable</Label>
+        <Input
+          value={draft.expectedDeliverable ?? ""}
+          onChange={(e) =>
+            setDraft({
+              ...draft,
+              expectedDeliverable: e.target.value,
+            })
+          }
+          placeholder="z. B. abgestimmte Liste, Dashboard-Link, Freigabe …"
+        />
+      </div>
+
+      {/* Status & Prio */}
+      <div className="grid md:grid-cols-2 gap-3">
         <div className="grid gap-2">
           <Label>Status</Label>
           <Select
-            value={draft.status || "planned"}
-            onValueChange={(v) =>
-              setDraft({ ...draft, status: v as Status })
+            value={draft.status ?? ""}
+            onValueChange={(value) =>
+              setDraft({
+                ...draft,
+                status: value as Status,
+              })
             }
           >
             <SelectTrigger className="w-full">
@@ -787,12 +856,16 @@ function TopicForm({
             </SelectContent>
           </Select>
         </div>
+
         <div className="grid gap-2">
           <Label>Priorität</Label>
           <Select
-            value={draft.priority || "medium"}
-            onValueChange={(v) =>
-              setDraft({ ...draft, priority: v as Priority })
+            value={draft.priority ?? ""}
+            onValueChange={(value) =>
+              setDraft({
+                ...draft,
+                priority: value as Priority,
+              })
             }
           >
             <SelectTrigger className="w-full">
@@ -805,28 +878,26 @@ function TopicForm({
             </SelectContent>
           </Select>
         </div>
-        <div className="grid gap-2">
-          <Label>Tags</Label>
-          <Input
-            value={draft.tags || ""}
-            onChange={(e) => setDraft({ ...draft, tags: e.target.value })}
-            placeholder="audit, regulatorisch…"
-          />
-        </div>
       </div>
+
+      {/* Tags */}
       <div className="grid gap-2">
-        <Label>Beschreibung (optional)</Label>
+        <Label>Tags (optional)</Label>
         <Input
-          value={draft.description || ""}
+          value={draft.tags ?? ""}
           onChange={(e) =>
-            setDraft({ ...draft, description: e.target.value })
+            setDraft({
+              ...draft,
+              tags: e.target.value,
+            })
           }
-          placeholder="Kurzbeschreibung, Kontext…"
+          placeholder="z. B. audit, regulatorisch, reporting"
         />
       </div>
     </div>
   );
 }
+
 
 function LogForm({
   topics,
@@ -966,20 +1037,67 @@ function PriorityBadge({ p }: { p: Priority }) {
 /* ===========================================================
    Main App
    =========================================================== */
+     
+   const EMPTY_STATE: AppState = {
+     teams: [],
+     areas: [],
+     topics: [],
+     logs: [],
+   };
+  
+     
+   export default function WorkRequestPlannerAppUX() {
+    const [state, dispatch] = React.useReducer(reducer, EMPTY_STATE);
+    const [loading, setLoading] = React.useState(true);
+    const [error, setError] = React.useState<string | null>(null);
 
-export default function WorkRequestPlannerAppUX() {
-  const [state, dispatch] = React.useReducer(
-    reducer,
-    undefined,
-    loadInitialState
-  );
-  React.useEffect(() => {
-    try {
-      localStorage.setItem(PRIMARY_KEY, JSON.stringify(state));
-    } catch (e) {
-      console.warn("Konnte State nicht in localStorage speichern:", e);
+    // 4.1: Initial-Laden aus Supabase statt localStorage
+    React.useEffect(() => {
+      let cancelled = false;
+  
+      (async () => {
+        try {
+          const remote = await dataStore.loadState();
+          if (!cancelled) {
+            dispatch({ type: "RESET_FROM_REMOTE", payload: remote });
+          }
+        } catch (e) {
+          console.error("Fehler beim Laden aus Supabase:", e);
+          if (!cancelled) {
+            setError("Daten konnten nicht geladen werden.");
+          }
+        } finally {
+          if (!cancelled) {
+            setLoading(false);
+          }          
+        }
+      })();
+  
+      return () => {
+        cancelled = true;
+      };
+    }, []);
+  
+    // Optional: weiterhin eine Kopie in localStorage halten (nur Spiegel, kein Source of Truth)
+    React.useEffect(() => {
+      try {
+        localStorage.setItem("work-request-planner:snapshot", JSON.stringify(state));
+      } catch (e) {
+        console.warn("Konnte State nicht in localStorage spiegeln:", e);
+      }
+    }, [state]);
+
+    if (loading) {
+      return <div className="p-4 text-sm text-muted-foreground">Lade Daten …</div>;
     }
-  }, [state]);  
+  
+    if (error) {
+      return (
+        <div className="p-4 text-sm text-destructive">
+          {error}
+        </div>
+      );
+    }
 
   /* ---- global UI ---- */
   const [query, setQuery] = React.useState("");
@@ -1062,12 +1180,13 @@ export default function WorkRequestPlannerAppUX() {
     setOpenTeamDialog(true);
   }
 
-  function saveTeam(name: string, owner: string) {
+  async function saveTeam(name: string, owner: string) {
     const norm = name.trim();
     if (!norm) {
       toast.error("Teamname fehlt");
       return;
     }
+  
     const duplicate = state.teams.some(
       (t) =>
         t.name.toLowerCase() === norm.toLowerCase() &&
@@ -1077,24 +1196,57 @@ export default function WorkRequestPlannerAppUX() {
       toast.error("Team existiert bereits");
       return;
     }
+  
     if (editTeam) {
-      const updated: Team = { ...editTeam, name: norm, owner: owner.trim() };
-      dispatch({ type: "UPDATE_TEAM", team: updated });
-      toast.success("Team aktualisiert");
+      // UPDATE
+      const updatedLocal: Team = { ...editTeam, name: norm, owner: owner.trim() };
+      dispatch({ type: "UPDATE_TEAM", team: updatedLocal });
+  
+      try {
+        const updatedFromDb = await dataStore.updateTeam(updatedLocal);
+        // falls DB etwas ändert (z. B. Trigger), kannst du optional noch mal dispatchen
+        dispatch({ type: "UPDATE_TEAM", team: updatedFromDb });
+        toast.success("Team aktualisiert");
+      } catch (e) {
+        console.error("Fehler beim Update in Supabase:", e);
+        toast.error("Team lokal aktualisiert, aber nicht im Backend.");
+      } finally {
+        setOpenTeamDialog(false);
+      }
     } else {
-      const t: Team = { id: uid(), name: norm, owner: owner.trim() };
-      dispatch({ type: "ADD_TEAM", team: t });
-      toast.success("Team angelegt");
+      // CREATE
+      const temp: Team = { id: uid(), name: norm, owner: owner.trim() };
+      dispatch({ type: "ADD_TEAM", team: temp });
+  
+      try {
+        const created = await dataStore.addTeam({ name: norm, owner: owner.trim() });
+        // endgültige DB-Version in den State spiegeln
+        dispatch({ type: "UPDATE_TEAM", team: created });
+        toast.success("Team angelegt");
+      } catch (e) {
+        console.error("Fehler beim Anlegen in Supabase:", e);
+        toast.error("Team lokal gespeichert, aber nicht im Backend.");
+      } finally {
+        setOpenTeamDialog(false);
+      }
     }
-    setOpenTeamDialog(false);
   }
-
-  function deleteTeam(id: string) {
+  
+  
+  async function deleteTeam(id: string) {
     if (!confirm("Team löschen? Verknüpfte Themen werden entfernt.")) return;
+  
     dispatch({ type: "DELETE_TEAM", id });
-    toast("Team gelöscht");
+    toast.success("Team gelöscht");
+  
+    try {
+      await dataStore.deleteTeam(id);
+    } catch (e) {
+      console.error("Fehler beim Löschen des Teams in Supabase:", e);
+      toast.error("Team lokal gelöscht, aber Backend-Löschung fehlgeschlagen.");
+    }
   }
-
+  
   /* ---- Areas ---- */
 
   function beginNewArea() {
@@ -1109,50 +1261,71 @@ export default function WorkRequestPlannerAppUX() {
     setOpenAreaDialog(true);
   }
 
-  function saveArea(name: string, contact?: string) {
+  async function saveArea(name: string, contact?: string) {
+    // ... Validierung & Duplicate-Check wie bisher ...
+  
     const norm = name.trim();
-    if (!norm) {
-      toast.error("Bereichsname fehlt");
-      return;
-    }
-    const duplicate = state.areas.some(
-      (a) =>
-        a.name.toLowerCase() === norm.toLowerCase() &&
-        a.id !== (editArea?.id || "")
-    );
-    if (duplicate) {
-      toast.error("Bereich existiert bereits");
-      return;
-    }
+
     if (editArea) {
-      const updated: Area = {
+      const updatedLocal: Area = {
         ...editArea,
         name: norm,
-        contact: contact?.trim() || undefined,
+        contact: contact?.trim() || "",
       };
-      dispatch({ type: "UPDATE_AREA", area: updated });
-      toast.success("Bereich aktualisiert");
+      dispatch({ type: "UPDATE_AREA", area: updatedLocal });
+  
+      try {
+        const updatedFromDb = await dataStore.updateArea(updatedLocal);
+        dispatch({ type: "UPDATE_AREA", area: updatedFromDb });
+        toast.success("Bereich aktualisiert");
+      } catch (e) {
+        console.error("Fehler beim Update Bereich:", e);
+        toast.error("Bereich lokal aktualisiert, aber nicht im Backend.");
+      } finally {
+        setOpenAreaDialog(false);
+      }
     } else {
-      const a: Area = {
+      const temp: Area = {
         id: uid(),
         name: norm,
-        contact: contact?.trim() || undefined,
+        contact: contact?.trim() || "",
       };
-      dispatch({ type: "ADD_AREA", area: a });
-      toast.success("Bereich angelegt");
+      dispatch({ type: "ADD_AREA", area: temp });
+  
+      try {
+        const created = await dataStore.addArea({
+          name: norm,
+          contact: contact?.trim() || "",
+        });
+        dispatch({ type: "UPDATE_AREA", area: created });
+        toast.success("Bereich angelegt");
+      } catch (e) {
+        console.error("Fehler beim Anlegen Bereich:", e);
+        toast.error("Bereich lokal gespeichert, aber nicht im Backend.");
+      } finally {
+        setOpenAreaDialog(false);
+      }
     }
-    setOpenAreaDialog(false);
   }
-
-  function deleteArea(id: string) {
+  
+  
+  async function deleteArea(id: string) {
     if (
       !confirm(
         "Bereich löschen? Er wird aus Themen entfernt; Logs zum Bereich werden gelöscht."
       )
     )
       return;
+  
     dispatch({ type: "DELETE_AREA", id });
-    toast("Bereich gelöscht");
+    toast.success("Bereich gelöscht");
+  
+    try {
+      await dataStore.deleteArea(id);
+    } catch (e) {
+      console.error("Fehler beim Löschen des Bereichs in Supabase:", e);
+      toast.error("Bereich lokal gelöscht, aber Backend-Löschung fehlgeschlagen.");
+    }
   }
 
   /* ---- Topics ---- */
@@ -1196,70 +1369,131 @@ export default function WorkRequestPlannerAppUX() {
     return null;
   }
 
-  function saveTopic(draft: Partial<Topic> | undefined, existing?: Topic) {
+  async function saveTopic(draft: Partial<Topic> | undefined, existing?: Topic) {
     if (!draft) return;
     const msg = validateTopic(draft);
     if (msg) {
       toast.error(msg);
       return;
     }
-    const base: Topic = existing
-      ? { ...existing }
-      : {
-          id: uid(),
-          teamId: draft.teamId!,
-          title: draft.title!.trim(),
-          areaIds: "",
-          expectedDeliverable: "",
-          priority: "medium",
-          status: "planned",
-          tags: "",
-        };
-    const topic: Topic = {
-      ...base,
-      ...draft,
-      title: draft.title!.trim(),
-      teamId: draft.teamId!,
-      areaIds: (draft.areaIds || "")
+  
+    const areaIds =
+      (draft.areaIds ??
+        existing?.areaIds ??
+        "")
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean)
-        .join(","),
-      expectedDeliverable: (draft.expectedDeliverable || "").trim(),
-      tags: (draft.tags || "").trim(),
-      nextRequestDate:
-        draft.startDate && draft.cadence
-          ? cadenceNextDate(draft.startDate, draft.cadence, draft.lastRequestDate)
-          : base.nextRequestDate,
-    };
+        .join(",");
+  
     if (existing) {
-      dispatch({ type: "UPDATE_TOPIC", topic });
-      toast.success("Thema aktualisiert");
+      // UPDATE
+      const localTopic: Topic = {
+        ...existing,
+        title: draft.title!.trim(),
+        teamId: draft.teamId!,
+        areaIds,
+        expectedDeliverable:
+          draft.expectedDeliverable ?? existing.expectedDeliverable,
+        priority: (draft.priority as Priority) ?? existing.priority,
+        status: (draft.status as Status) ?? existing.status,
+        cadence: (draft.cadence as Cadence) ?? existing.cadence,
+        dueStrategy:
+          (draft.dueStrategy as Topic["dueStrategy"]) ?? existing.dueStrategy,
+        dueOffsetDays: draft.dueOffsetDays ?? existing.dueOffsetDays,
+        startDate: draft.startDate ?? existing.startDate,
+        tags: draft.tags ?? existing.tags,
+        lastRequestDate: draft.lastRequestDate ?? existing.lastRequestDate,
+        nextRequestDate:
+          draft.nextRequestDate ??
+          existing.nextRequestDate ??
+          cadenceNextDate(
+            draft.startDate ?? existing.startDate!,
+            (draft.cadence as Cadence) ?? existing.cadence!,
+            draft.lastRequestDate ?? existing.lastRequestDate
+          ),
+      };
+  
+      dispatch({ type: "UPDATE_TOPIC", topic: localTopic });
+  
+      try {
+        const updated = await dataStore.updateTopic(localTopic);
+        dispatch({ type: "UPDATE_TOPIC", topic: updated });
+        toast.success("Thema aktualisiert");
+      } catch (e) {
+        console.error("Fehler beim Speichern des Themas in Supabase:", e);
+        toast.error("Thema lokal gespeichert, aber nicht im Backend.");
+      } finally {
+        setOpenTopicDialog(false);
+      }
     } else {
-      dispatch({ type: "ADD_TOPIC", topic });
-      toast.success("Thema angelegt");
+      // CREATE
+      const commons: Omit<Topic, "id"> = {
+        teamId: draft.teamId!,
+        title: draft.title!.trim(),
+        areaIds,
+        expectedDeliverable: draft.expectedDeliverable ?? "",
+        priority: (draft.priority as Priority) ?? "medium",
+        status: (draft.status as Status) ?? "planned",
+        cadence: (draft.cadence as Cadence) ?? "one-off",
+        dueStrategy:
+          (draft.dueStrategy as Topic["dueStrategy"]) ?? "fixed-date",
+        dueOffsetDays: draft.dueOffsetDays,
+        startDate:
+          draft.startDate || new Date().toISOString().slice(0, 10),
+        tags: draft.tags ?? "",
+        lastRequestDate: draft.lastRequestDate,
+        nextRequestDate:
+          draft.nextRequestDate ??
+          cadenceNextDate(
+            draft.startDate || new Date().toISOString().slice(0, 10),
+            (draft.cadence as Cadence) ?? "one-off",
+            draft.lastRequestDate
+          ),
+      };
+  
+      // optimistic local add (temporäre ID)
+      const temp: Topic = { id: uid(), ...commons };
+      dispatch({ type: "ADD_TOPIC", topic: temp });
+  
+      try {
+        const created = await dataStore.addTopic(commons);
+        dispatch({ type: "UPDATE_TOPIC", topic: created });
+        toast.success("Thema angelegt");
+      } catch (e) {
+        console.error("Fehler beim Speichern des Themas in Supabase:", e);
+        toast.error("Thema lokal gespeichert, aber nicht im Backend.");
+      } finally {
+        setOpenTopicDialog(false);
+      }
     }
-    setOpenTopicDialog(false);
-  }
-
-  function deleteTopic(id: string) {
-    if (
-      !confirm("Thema löschen? Alle zugehörigen Logs werden ebenfalls gelöscht.")
-    )
-      return;
+  }  
+  
+  
+  async function deleteTopic(id: string) {
+    if (!confirm("Thema löschen? Alle zugehörigen Logs werden entfernt.")) return;
+  
+    // erst lokal
     dispatch({ type: "DELETE_TOPIC", id });
-    toast("Thema gelöscht");
+    toast.success("Thema gelöscht");
+  
+    try {
+      await dataStore.deleteTopic(id);
+    } catch (e) {
+      console.error("Fehler beim Löschen in Supabase:", e);
+      toast.error("Thema lokal gelöscht, aber Backend-Löschung fehlgeschlagen.");
+    }
   }
-
+  
   /* ---- Logs ---- */
 
-  function addLog(l: Partial<RequestLog>) {
+  async function addLog(l: Partial<RequestLog>) {
     if (!l.topicId || !l.toAreaId) {
       toast.error("Bitte Topic und Bereich wählen");
       return;
     }
-    const log: RequestLog = {
-      id: uid(),
+  
+    const logInput: Omit<RequestLog, "id"> = {
       topicId: l.topicId!,
       toAreaId: l.toAreaId!,
       date: l.date || new Date().toISOString().slice(0, 10),
@@ -1267,23 +1501,37 @@ export default function WorkRequestPlannerAppUX() {
       notes: l.notes || "",
       outcome: (l.outcome as any) || "sent",
     };
-    dispatch({ type: "ADD_LOG", log });
-
-    const topic = state.topics.find((t) => t.id === log.topicId);
-    if (topic) {
-      const updated: Topic = {
-        ...topic,
-        lastRequestDate: log.date,
-        nextRequestDate:
-          topic.startDate && topic.cadence
-            ? cadenceNextDate(topic.startDate, topic.cadence, log.date)
-            : topic.nextRequestDate,
-      };
-      dispatch({ type: "UPDATE_TOPIC", topic: updated });
+  
+    try {
+      // 1) in Supabase anlegen → echte ID zurück
+      const created = await dataStore.addLog(logInput);
+  
+      // 2) in den lokalen State stecken
+      dispatch({ type: "ADD_LOG", log: created });
+  
+      // 3) Topic-Next-Date aktualisieren
+      const topic = state.topics.find((t) => t.id === created.topicId);
+      if (topic) {
+        const updated: Topic = {
+          ...topic,
+          lastRequestDate: created.date,
+          nextRequestDate:
+            topic.startDate && topic.cadence
+              ? cadenceNextDate(topic.startDate, topic.cadence, created.date)
+              : topic.nextRequestDate,
+        };
+        dispatch({ type: "UPDATE_TOPIC", topic: updated });
+      }
+  
+      toast.success("Protokoll gespeichert");
+    } catch (e) {
+      console.error("Fehler beim Speichern des Logs in Supabase:", e);
+      toast.error("Protokoll konnte nicht gespeichert werden.");
+    } finally {
+      setOpenLogDialog(false);
     }
-    toast.success("Protokoll gespeichert");
-    setOpenLogDialog(false);
-  }
+  }  
+    
 
   function deleteLog(id: string) {
     dispatch({ type: "DELETE_LOG", id });
