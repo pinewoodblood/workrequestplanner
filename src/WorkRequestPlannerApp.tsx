@@ -1087,17 +1087,6 @@ function PriorityBadge({ p }: { p: Priority }) {
       }
     }, [state]);
 
-    if (loading) {
-      return <div className="p-4 text-sm text-muted-foreground">Lade Daten …</div>;
-    }
-  
-    if (error) {
-      return (
-        <div className="p-4 text-sm text-destructive">
-          {error}
-        </div>
-      );
-    }
 
   /* ---- global UI ---- */
   const [query, setQuery] = React.useState("");
@@ -1110,9 +1099,7 @@ function PriorityBadge({ p }: { p: Priority }) {
   const [fltTo, setFltTo] = React.useState<string>("");
   const [fltTag, setFltTag] = React.useState<string>("");
   const [advancedOpen, setAdvancedOpen] = React.useState(false);
-  
-  const [openImportDialog, setOpenImportDialog] = useState(false);
-  
+  const [openImportDialog, setOpenImportDialog] = React.useState(false);
   const [openTopicDialog, setOpenTopicDialog] = React.useState(false);
   const [openTeamDialog, setOpenTeamDialog] = React.useState(false);
   const [openAreaDialog, setOpenAreaDialog] = React.useState(false);
@@ -1786,6 +1773,18 @@ function PriorityBadge({ p }: { p: Priority }) {
 
     reader.readAsText(file, "utf-8");
   };
+
+  if (loading) {
+    return <div className="p-4 text-sm text-muted-foreground">Lade Daten …</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 text-sm text-destructive">
+        {error}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 text-slate-900 flex flex-col">
