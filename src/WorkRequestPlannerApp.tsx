@@ -1734,10 +1734,6 @@ function PriorityBadge({ p }: { p: Priority }) {
         // --- JSON-Import: verstecktes File-Input + Handler -----------------
   const jsonFileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const handleJsonImportClick = () => {
-    jsonFileInputRef.current?.click();
-  };
-
   const handleJsonFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -1885,9 +1881,8 @@ function PriorityBadge({ p }: { p: Priority }) {
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuLabel>Import</DropdownMenuLabel>
-                      <DropdownMenuItem onClick={handleJsonImportClick}>
-                        <Import className="h-4 w-4 mr-2" />
-                        {STR.actions.jsonImport}
+                      <DropdownMenuItem onClick={() => setOpenImportDialog(true)}>
+                        JSON importieren
                       </DropdownMenuItem>
                       </DropdownMenuContent>
                   </DropdownMenu>
@@ -3302,61 +3297,63 @@ function PriorityBadge({ p }: { p: Priority }) {
       </Dialog>
 
       {/* Import Dialog */}
-<Dialog open={openImportDialog} onOpenChange={setOpenImportDialog}>
-  <DialogContent>
-    <DialogHeader>
-      <DialogTitle>Daten importieren</DialogTitle>
-      <DialogDescription>
-        Lade eine JSON-Datei hoch, um Daten zu importieren.
-      </DialogDescription>
-    </DialogHeader>
+      <Dialog open={openImportDialog} onOpenChange={setOpenImportDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Daten importieren</DialogTitle>
+            <DialogDescription>
+              Wähle zuerst den Import-Modus und starte dann den Import mit einer JSON-Datei.
+            </DialogDescription>
+          </DialogHeader>
 
-    <div className="space-y-2">
-  <label className="font-medium">Import-Modus:</label>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="font-medium">Import-Modus</Label>
+              <div className="flex flex-col gap-2">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="importMode"
+                    value="append"
+                    checked={importMode === "append"}
+                    onChange={() => setImportMode("append")}
+                  />
+                  <span>Hinzufügen (bestehende Daten bleiben erhalten)</span>
+                </label>
 
-  <div className="flex flex-col gap-2">
-    <label className="flex items-center gap-2">
-      <input
-        type="radio"
-        name="importMode"
-        value="append"
-        checked={importMode === "append"}
-        onChange={() => setImportMode("append")}
-      />
-      <span>Hinzufügen (bestehende Daten bleiben erhalten)</span>
-    </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="importMode"
+                    value="truncateAll"
+                    checked={importMode === "truncateAll"}
+                    onChange={() => setImportMode("truncateAll")}
+                  />
+                  <span>
+                    Komplett ersetzen (alle vorhandenen Daten in Supabase werden gelöscht)
+                  </span>
+                </label>
+              </div>
+            </div>
+          </div>
 
-    <label className="flex items-center gap-2">
-      <input
-        type="radio"
-        name="importMode"
-        value="truncateAll"
-        checked={importMode === "truncateAll"}
-        onChange={() => setImportMode("truncateAll")}
-      />
-      <span>Komplett ersetzen (alle vorhandenen Daten löschen)</span>
-    </label>
-  </div>
-</div>
-
-
-    {/* Datei auswählen */}
-    <div className="mt-4">
-      <input
-        type="file"
-        accept="application/json"
-        ref={jsonFileInputRef}
-        onChange={handleJsonFileChange}
-      />
-    </div>
-
-    <DialogFooter>
-      <Button variant="outline" onClick={() => setOpenImportDialog(false)}>
-        Abbrechen
-      </Button>
-    </DialogFooter>
-  </DialogContent>
-</Dialog>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenImportDialog(false)}>
+              <X className="h-4 w-4 mr-1" />
+              Abbrechen
+            </Button>
+            <Button
+              onClick={() => {
+                setOpenImportDialog(false);
+                jsonFileInputRef.current?.click(); // 👉 startet Dateiauswahl + handleJsonFileChange
+              }}
+            >
+              <Import className="h-4 w-4 mr-1" />
+              Datei auswählen & importieren
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
 
       {/* Detail Sheet */}
@@ -3372,6 +3369,7 @@ function PriorityBadge({ p }: { p: Priority }) {
                   {detailTopic.title}
                 </SheetTitle>
               </SheetHeader>
+              
               <div className="mt-4 space-y-3 text-sm">
                 <div className="flex items-center gap-2">
                   <StatusBadge s={detailTopic.status} />
