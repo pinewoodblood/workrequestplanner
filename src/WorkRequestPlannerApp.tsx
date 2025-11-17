@@ -101,6 +101,8 @@ import {
   DropdownMenuSeparator,
 } from "./components/ui/dropdown-menu";
 
+import type { Session } from "@supabase/supabase-js";
+import { supabase } from "./lib/supabaseClient"; // Pfad ggf. anpassen
 import { dataStore } from "./lib/dataStore";
 
 /* ===========================================================
@@ -1063,6 +1065,34 @@ function PriorityBadge({ p }: { p: Priority }) {
     const [state, dispatch] = React.useReducer(reducer, EMPTY_STATE);
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState<string | null>(null);
+    const [session, setSession] = React.useState<Session | null>(null);
+
+    React.useEffect(() => {
+      // aktuelle Session holen
+      supabase.auth.getSession().then(({ data }) => {
+        setSession(data.session ?? null);
+      });
+  
+      // Änderungen an der Session abonnieren
+      const { data: subscription } = supabase.auth.onAuthStateChange(
+        (_event, newSession) => {
+          setSession(newSession);
+        }
+      );
+  
+      return () => {
+        subscription.subscription.unsubscribe();
+      };
+    }, []);
+
+    async function handleLogout() {
+      try {
+        await supabase.auth.signOut();
+        // Session wird über onAuthStateChange → setSession(null) gesetzt
+      } catch (e) {
+        console.error("Logout fehlgeschlagen:", e);
+      }
+    }  
 
     // 4.1: Initial-Laden aus Supabase statt localStorage
     React.useEffect(() => {
@@ -1906,8 +1936,9 @@ function PriorityBadge({ p }: { p: Priority }) {
                 <div className="flex justify-end items-center gap-3 text-xs text-muted-foreground">
                   <span>{session.user?.email}</span>
                   <Button
-                    variant="outline"
-                    size="xs"
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-xs"
                     onClick={handleLogout}
                   >
                     Logout
