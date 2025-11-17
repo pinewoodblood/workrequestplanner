@@ -1771,12 +1771,7 @@ function PriorityBadge({ p }: { p: Priority }) {
   
           toast.success("Alle Daten ersetzt.");
         } else {
-          const ok = window.confirm(
-            "Die JSON-Daten werden zu den vorhandenen Daten HINZUGEFÜGT.\n" +
-            "Einträge mit gleicher ID werden überschrieben.\n\nFortfahren?"
-          );
-          if (!ok) return;
-  
+            
           const merged: AppState = {
             teams: mergeById(state.teams, parsed.teams),
             areas: mergeById(state.areas, parsed.areas),
