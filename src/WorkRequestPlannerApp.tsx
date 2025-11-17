@@ -1679,6 +1679,49 @@ function PriorityBadge({ p }: { p: Priority }) {
     return { next7, next30, overdue, perArea, perTeam, months };
   }, [filteredTopics]);
 
+  function jumpToTopicsOverdue() {
+    // alle Filter zurücksetzen
+    clearFilters();
+  
+    const todayISO = new Date().toISOString().slice(0, 10);
+    // "Gestern" = heute - 1 Tag
+    const yesterdayISO = addDaysISO(todayISO, -1);
+  
+    // Datum nur bis gestern, ab beliebig
+    setFltFrom("");
+    setFltTo(yesterdayISO);
+  
+    // Optional: nur offene/aktive Themen
+    // setFltStatus("planned");
+  
+    setActiveTab("topics");
+  }
+  
+  function jumpToTopicsNext7() {
+    clearFilters();
+  
+    const todayISO = new Date().toISOString().slice(0, 10);
+    const toISO = addDaysISO(todayISO, 7);
+  
+    setFltFrom(todayISO);
+    setFltTo(toISO);
+  
+    setActiveTab("topics");
+  }
+  
+  function jumpToTopicsNext30() {
+    clearFilters();
+  
+    const todayISO = new Date().toISOString().slice(0, 10);
+    const toISO = addDaysISO(todayISO, 30);
+  
+    setFltFrom(todayISO);
+    setFltTo(toISO);
+  
+    setActiveTab("topics");
+  }
+  
+
   /* ---- Calendar Data ---- */
 
   const calendarDays = React.useMemo(() => {
@@ -2168,43 +2211,54 @@ function PriorityBadge({ p }: { p: Priority }) {
             {/* Overview */}
             <TabsContent value="overview">
               <div className="grid gap-4 md:grid-cols-4">
-                <Card>
+              <Card
+                className="cursor-pointer hover:bg-muted/60 transition"
+                onClick={jumpToTopicsNext7}
+              >
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Fälligkeiten in den nächsten 7 Tagen
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">{kpi.next7}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Klick, um die Themen der nächsten 7 Tage zu sehen
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card
+                className="cursor-pointer hover:bg-muted/60 transition"
+                onClick={jumpToTopicsNext30}
+              >
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Fälligkeiten in den nächsten 30 Tagen
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">{kpi.next30}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Klick, um die Themen der nächsten 30 Tage zu sehen
+                  </p>
+                </CardContent>
+              </Card>
+
+                <Card
+                  className="cursor-pointer hover:bg-muted/60 transition"
+                  onClick={jumpToTopicsOverdue}
+                >
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">
-                      {STR.kpis.next7}
+                    <CardTitle className="text-sm font-medium">
+                      Überfällige Themen
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="flex items-center gap-3">
-                    <CalendarClock className="h-5 w-5" />
-                    <div className="text-3xl font-semibold">
-                      {kpi.next7}
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">
-                      {STR.kpis.next30}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex items-center gap-3">
-                    <CalendarDays className="h-5 w-5" />
-                    <div className="text-3xl font-semibold">
-                      {kpi.next30}
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">
-                      {STR.kpis.overdue}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex items-center gap-3">
-                    <Clock className="h-5 w-5 text-destructive" />
-                    <div className="text-3xl font-semibold text-destructive">
-                      {kpi.overdue}
-                    </div>
+                  <CardContent>
+                    <div className="text-3xl font-bold">{kpi.overdue}</div>
+                    <p className="text-xs text-muted-foreground">
+                      Klick, um alle überfälligen Themen anzuzeigen
+                    </p>
                   </CardContent>
                 </Card>
                 <Card>
