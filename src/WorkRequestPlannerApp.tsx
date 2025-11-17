@@ -1728,7 +1728,7 @@ function PriorityBadge({ p }: { p: Priority }) {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       try {
         const text = String(reader.result || "");
         const parsed = JSON.parse(text);
