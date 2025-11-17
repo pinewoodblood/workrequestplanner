@@ -1825,6 +1825,7 @@ function PriorityBadge({ p }: { p: Priority }) {
         <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="w-full px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex flex-col gap-3">
+              {/* Erste Zeile: Titel + Supabase-Badge + Haupt-Toolbar */}
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <h1 className="text-3xl font-semibold tracking-tight">
@@ -1899,6 +1900,20 @@ function PriorityBadge({ p }: { p: Priority }) {
                   </Tooltip>
                 </div>
               </div>
+
+               {/* NEUE ZEILE: User + Logout, rechtsbündig unter der Toolbar */}
+              {session && (
+                <div className="flex justify-end items-center gap-3 text-xs text-muted-foreground">
+                  <span>{session.user?.email}</span>
+                  <Button
+                    variant="outline"
+                    size="xs"
+                    onClick={handleLogout}
+                  >
+                    Logout
+                  </Button>
+                </div>
+              )}
 
               <p className="text-sm text-muted-foreground">
                 {STR.subtitle}
