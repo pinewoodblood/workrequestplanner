@@ -293,8 +293,7 @@ function mergeById<T extends { id: string }>(existing: T[], incoming: T[]): T[] 
 
   return Array.from(map.values());
 }
-
-
+ 
 /* ===========================================================
    State / Reducer / Persist
    =========================================================== */
@@ -1147,7 +1146,7 @@ function PriorityBadge({ p }: { p: Priority }) {
   const [openTeamDialog, setOpenTeamDialog] = React.useState(false);
   const [openAreaDialog, setOpenAreaDialog] = React.useState(false);
   const [openLogDialog, setOpenLogDialog] = React.useState(false);
-
+  const [activeTab, setActiveTab] = React.useState<"overview" | "matrix" | "calendar" | "topics" | "log" | "reports" | "areas" | "teams">("overview");
   const [topicDraft, setTopicDraft] = React.useState<Partial<Topic>>();
   const [editTopic, setEditTopic] = React.useState<Topic | undefined>();
 
@@ -1196,6 +1195,23 @@ function PriorityBadge({ p }: { p: Priority }) {
     setFltFrom("");
     setFltTo("");
     setFltTag("");
+  }
+
+  function handleMatrixCellClick(teamId: string, areaId: string) {
+    // Filter passend setzen
+    setFltTeam(teamId);
+    setFltArea(areaId);
+
+    // optional weitere Filter zurücksetzen, wenn du möchtest:
+    // setFltStatus("all");
+    // setFltCadence("all");
+    // setFltPriority("all");
+    // setFltFrom("");
+    // setFltTo("");
+    // setFltTag("");
+
+    // auf den Themen-Tab wechseln
+    setActiveTab("topics");
   }
 
   /* ---- Teams ---- */
@@ -2312,25 +2328,30 @@ function PriorityBadge({ p }: { p: Priority }) {
                                 ? STR.calendar.today
                                 : next
                               : "—";
-                            return (
-                              <TableCell key={a.id}>
-                                <div className="p-2 border rounded-lg flex items-center justify-between">
-                                  <div className="text-2xl font-semibold">
-                                    {cell.length}
+                              return (
+                                <TableCell
+                                  key={a.id}
+                                  className="cursor-pointer hover:bg-muted/40"
+                                  onClick={() => handleMatrixCellClick(t.id, a.id)}
+                                >
+                                  <div className="p-2 border rounded-lg flex items-center justify-between">
+                                    <div className="text-2xl font-semibold">
+                                      {cell.length}
+                                    </div>
+                                    <Badge
+                                      variant={
+                                        next && isOverdue(next)
+                                          ? "destructive"
+                                          : "secondary"
+                                      }
+                                      // Badge darf ruhig klickbar aussehen
+                                      className="ml-2"
+                                    >
+                                      {badge}
+                                    </Badge>
                                   </div>
-                                  <Badge
-                                    variant={
-                                      next && isOverdue(next)
-                                        ? "destructive"
-                                        : "secondary"
-                                    }
-                                    className="cursor-default"
-                                  >
-                                    {badge}
-                                  </Badge>
-                                </div>
-                              </TableCell>
-                            );
+                                </TableCell>
+                              );                            
                           })}
                         </TableRow>
                       ))}
