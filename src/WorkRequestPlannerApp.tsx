@@ -282,6 +282,17 @@ function getDue(t: Topic): string | undefined {
   return t.nextRequestDate ?? t.startDate ?? undefined;
 }
 
+// Hilfsfunktion: führt Arrays nach ID zusammen
+function mergeById<T extends { id: string }>(existing: T[], incoming: T[]): T[] {
+  const map = new Map<string, T>();
+
+  for (const e of existing) map.set(e.id, e);
+  for (const i of incoming) map.set(i.id, i);
+
+  return Array.from(map.values());
+}
+
+
 /* ===========================================================
    State / Reducer / Persist
    =========================================================== */
@@ -316,6 +327,7 @@ type Action =
   | { type: "DELETE_LOG"; id: string }
   | { type: "RECALC_DATES" }
   | { type: "IMPORT_STATE"; payload: AppState };
+  
 
 
   const emptyState: State = { teams: [], areas: [], topics: [], logs: [] };
@@ -1726,18 +1738,18 @@ function PriorityBadge({ p }: { p: Priority }) {
     jsonFileInputRef.current?.click();
   };
 
-  const handleJsonFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleJsonFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (!file) return;
-
+  
     const reader = new FileReader();
-   
+  
     reader.onload = async () => {
       try {
         const text = String(reader.result || "");
         const parsed = JSON.parse(text);
-
-        // sehr leichte Schema-Prüfung
+  
+        // Grundvalidierung
         if (
           !parsed ||
           typeof parsed !== "object" ||
@@ -1746,46 +1758,54 @@ function PriorityBadge({ p }: { p: Priority }) {
           !Array.isArray(parsed.topics) ||
           !Array.isArray(parsed.logs)
         ) {
-          toast.error("Ungültiges JSON. Die Datei entspricht nicht der erwarteten Struktur.");
+          toast.error("Ungültiges JSON-Format.");
           return;
         }
-
-        // optional: Nachfrage, ob wirklich alles ersetzt werden soll
-        if (
-          !window.confirm(
-            importMode === "append"
-            ? "JSON wird zu bestehenden Daten hinzugefügt. Fortfahren?"
-            : "Bestehende Daten durch die importierte JSON-Datei ersetzen?"
-          )
-        ) {
-          return;
+  
+        // --- Modusabhängige Bestätigung ---
+        if (importMode === "truncateAll") {
+          const ok = window.confirm(
+            "⚠️ ALLE vorhandenen Daten (Teams, Bereiche, Themen, Logs) in Supabase werden GELÖSCHT.\n" +
+            "Dann wird die JSON komplett importiert.\n\nFortfahren?"
+          );
+          if (!ok) return;
+  
+          await dataStore.replaceAllWithSnapshot(parsed);
+          dispatch({ type: "RESET_FROM_REMOTE", payload: parsed });
+  
+          toast.success("Alle Daten ersetzt.");
+        } else {
+          const ok = window.confirm(
+            "Die JSON-Daten werden zu den vorhandenen Daten HINZUGEFÜGT.\n" +
+            "Einträge mit gleicher ID werden überschrieben.\n\nFortfahren?"
+          );
+          if (!ok) return;
+  
+          const merged: AppState = {
+            teams: mergeById(state.teams, parsed.teams),
+            areas: mergeById(state.areas, parsed.areas),
+            topics: mergeById(state.topics, parsed.topics),
+            logs: mergeById(state.logs, parsed.logs),
+          };
+  
+          await dataStore.replaceAllWithSnapshot(merged);
+          dispatch({ type: "RESET_FROM_REMOTE", payload: merged });
+  
+          toast.success("Daten hinzugefügt.");
         }
-
-         // ⭐ WICHTIG: hier wird jetzt der Modus übergeben!
-         await dataStore.replaceAllWithSnapshot(parsed, importMode);
-
-      // 2) Lokalen State synchron halten
-      dispatch({ type: "RESET_FROM_REMOTE", payload: parsed });
-
-      toast.success("Daten importiert und in Supabase gespeichert.");
-    } catch (err) {
-      console.error("JSON-Import-Fehler", err);
-      toast.error("Import fehlgeschlagen. Die JSON-Datei konnte nicht verarbeitet werden.");
-    } finally {
-      if (jsonFileInputRef.current) {
-        jsonFileInputRef.current.value = "";
+      } catch (err) {
+        console.error("JSON-Import-Fehler:", err);
+        toast.error("Import fehlgeschlagen.");
+      } finally {
+        if (jsonFileInputRef.current) {
+          jsonFileInputRef.current.value = "";
+        }
       }
-    }
+    };
+  
+    reader.readAsText(file, "utf-8");
   };
-
-  reader.onerror = () => {
-    toast.error("Lesefehler. Die Datei konnte nicht gelesen werden.");
-    if (jsonFileInputRef.current) {
-      jsonFileInputRef.current.value = "";
-    }
-  };
-  reader.readAsText(file, "utf-8");
-};
+  
 
   if (loading) {
     return <div className="p-4 text-sm text-muted-foreground">Lade Daten …</div>;
@@ -3291,29 +3311,34 @@ function PriorityBadge({ p }: { p: Priority }) {
       </DialogDescription>
     </DialogHeader>
 
-    {/* Import-Modus-Auswahl */}
-    <div className="mt-4">
-      <label className="font-medium">Import-Modus:</label>
-      <div className="flex gap-4 mt-2">
-        <label className="flex items-center gap-2">
-          <input
-            type="radio"
-            checked={importMode === "append"}
-            onChange={() => setImportMode("append")}
-          />
-          <span>Anhängen</span>
-        </label>
+    <div className="space-y-2">
+  <label className="font-medium">Import-Modus:</label>
 
-        <label className="flex items-center gap-2">
-          <input
-            type="radio"
-            checked={importMode === "truncateAll"}
-            onChange={() => setImportMode("truncateAll")}
-          />
-          <span>Alles löschen + importieren</span>
-        </label>
-      </div>
-    </div>
+  <div className="flex flex-col gap-2">
+    <label className="flex items-center gap-2">
+      <input
+        type="radio"
+        name="importMode"
+        value="append"
+        checked={importMode === "append"}
+        onChange={() => setImportMode("append")}
+      />
+      <span>Hinzufügen (bestehende Daten bleiben erhalten)</span>
+    </label>
+
+    <label className="flex items-center gap-2">
+      <input
+        type="radio"
+        name="importMode"
+        value="truncateAll"
+        checked={importMode === "truncateAll"}
+        onChange={() => setImportMode("truncateAll")}
+      />
+      <span>Komplett ersetzen (alle vorhandenen Daten löschen)</span>
+    </label>
+  </div>
+</div>
+
 
     {/* Datei auswählen */}
     <div className="mt-4">
