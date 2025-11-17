@@ -1723,17 +1723,21 @@ function PriorityBadge({ p }: { p: Priority }) {
     jsonFileInputRef.current?.click();
   };
 
-  const handleJsonFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleJsonFileChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
     if (!file) return;
-
+  
     const reader = new FileReader();
+  
+    // <<< wichtig: async CALLBACK, nicht oben auf Dateiebene >>>
     reader.onload = async () => {
       try {
-        const text = String(reader.result || "");
-        const parsed = JSON.parse(text);
-
-        // sehr leichte Schema-Prüfung
+        const text = String(reader.result ?? "");
+        const parsed = JSON.parse(text) as AppState;
+  
+        // Grundstruktur prüfen
         if (
           !parsed ||
           typeof parsed !== "object" ||
@@ -1742,40 +1746,51 @@ function PriorityBadge({ p }: { p: Priority }) {
           !Array.isArray(parsed.topics) ||
           !Array.isArray(parsed.logs)
         ) {
-          toast.error("Ungültiges JSON. Die Datei entspricht nicht der erwarteten Struktur.");
+          toast.error(
+            "Ungültiges JSON. Die Datei entspricht nicht der erwarteten Struktur."
+          );
           return;
         }
-
-        // optional: Nachfrage, ob wirklich alles ersetzt werden soll
+  
+        // Sicherheitsfrage
         if (
           !window.confirm(
-            "Bestehende Daten durch die importierte JSON-Datei ersetzen?"
+            "Bestehende Daten (Supabase + lokaler State) durch diese JSON-Datei ersetzen?"
           )
         ) {
           return;
         }
-
+  
         // 1) Supabase-Snapshot ersetzen
-      await dataStore.replaceAllWithSnapshot(parsed);
-
-      // 2) Lokalen State synchron halten
-      dispatch({ type: "RESET_FROM_REMOTE", payload: parsed });
-
-      toast.success("Daten importiert und in Supabase gespeichert.");
-    } catch (err) {
-      console.error("JSON-Import-Fehler", err);
-      toast.error("Import fehlgeschlagen. Die JSON-Datei konnte nicht verarbeitet werden.");
-    } finally {
+        await dataStore.replaceAllWithSnapshot(parsed);
+  
+        // 2) Lokalen State synchron ziehen
+        dispatch({ type: "RESET_FROM_REMOTE", payload: parsed });
+  
+        toast.success("Daten importiert und in Supabase gespeichert.");
+      } catch (err) {
+        console.error("JSON-Import-Fehler", err);
+        toast.error(
+          "Import fehlgeschlagen. Die JSON-Datei konnte nicht verarbeitet werden."
+        );
+      } finally {
+        // Input resetten, damit dieselbe Datei erneut wählbar ist
+        if (jsonFileInputRef.current) {
+          jsonFileInputRef.current.value = "";
+        }
+      }
+    };
+  
+    reader.onerror = () => {
+      toast.error("Lesefehler. Die Datei konnte nicht gelesen werden.");
       if (jsonFileInputRef.current) {
         jsonFileInputRef.current.value = "";
       }
-    }
+    };
+  
+    reader.readAsText(file, "utf-8");
   };
-  reader.onerror = () => {
-    toast.error("Lesefehler. Die Datei konnte nicht gelesen werden.");
-  };
-  reader.readAsText(file, "utf-8");
-};
+  
 
   if (loading) {
     return <div className="p-4 text-sm text-muted-foreground">Lade Daten …</div>;
