@@ -2139,7 +2139,13 @@ function PriorityBadge({ p }: { p: Priority }) {
             </CardContent>
           </Card>
         ) : (
-          <Tabs defaultValue="overview" className="space-y-4 w-full h-full">
+          <Tabs
+            value={activeTab}
+            onValueChange={(val) =>
+              setActiveTab(val as
+                "overview" | "matrix" | "calendar" | "topics" | "log" | "reports" | "areas" | "teams"
+              )
+            } className="space-y-4 w-full h-full">
             <TabsList className="sticky top-0 z-30 w-full overflow-x-auto flex items-center gap-2 rounded-2xl bg-secondary/80 backdrop-blur p-2 supports-[backdrop-filter]:bg-secondary/60">
               <TabsTrigger value="overview">
                 {STR.tabs.overview}
@@ -2329,12 +2335,12 @@ function PriorityBadge({ p }: { p: Priority }) {
                                 : next
                               : "—";
                               return (
-                                <TableCell
-                                  key={a.id}
-                                  className="cursor-pointer hover:bg-muted/40"
-                                  onClick={() => handleMatrixCellClick(t.id, a.id)}
-                                >
-                                  <div className="p-2 border rounded-lg flex items-center justify-between">
+                                <TableCell key={a.id}>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleMatrixCellClick(t.id, a.id)}
+                                    className="w-full p-2 border rounded-lg flex items-center justify-between text-left hover:bg-muted/60 transition"
+                                  >
                                     <div className="text-2xl font-semibold">
                                       {cell.length}
                                     </div>
@@ -2344,12 +2350,10 @@ function PriorityBadge({ p }: { p: Priority }) {
                                           ? "destructive"
                                           : "secondary"
                                       }
-                                      // Badge darf ruhig klickbar aussehen
-                                      className="ml-2"
                                     >
                                       {badge}
                                     </Badge>
-                                  </div>
+                                  </button>
                                 </TableCell>
                               );                            
                           })}
