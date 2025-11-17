@@ -1,4 +1,11 @@
-import WorkRequestPlannerApp from "./WorkRequestPlannerApp";
+// App.tsx
+import WorkRequestPlannerAppUX from "./WorkRequestPlannerApp";
+import { AuthGate } from "./lib/AuthGate";
+
 export default function App() {
-  return <WorkRequestPlannerApp />;
+  return (
+    <AuthGate>
+      <WorkRequestPlannerAppUX />
+    </AuthGate>
+  );
 }
