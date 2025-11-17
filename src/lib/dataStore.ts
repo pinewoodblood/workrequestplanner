@@ -37,6 +37,10 @@ export interface DataStore {
   addLog(input: Omit<RequestLog, "id">): Promise<RequestLog>;
   updateLog(log: RequestLog): Promise<RequestLog>;
   deleteLog(id: string): Promise<void>;
+  
+   /** Alles (Teams, Areas, Topics, Logs) für diesen User löschen */
+   deleteAllForUser(): Promise<void>;
+  
   // JSON Upload
   replaceAllWithSnapshot(snapshot: AppState): Promise<void>;
 }
@@ -575,76 +579,114 @@ export const dataStore: DataStore = {
     if (res.error) throw res.error;
   },
 
+  async deleteAllForUser(): Promise<void> {
+    // Wenn du RLS mit user_id = auth.uid() nutzt UND bereits Supabase Auth im Frontend,
+    // kannst du hier optional noch explizit nach user_id filtern.
+    //
+    // In den meisten Fällen reicht es, einfach delete() aufzurufen – 
+    // RLS sorgt dann dafür, dass nur die Zeilen des aktuellen Users gelöscht werden.
+  
+    // Reihenfolge ist wichtig wegen Foreign Keys:
+    // 1. Joins
+    let res = await supabase.from("topic_areas").delete();
+    if (res.error) throw res.error;
+  
+    // 2. Logs
+    res = await supabase.from("request_logs").delete();
+    if (res.error) throw res.error;
+  
+    // 3. Topics
+    res = await supabase.from("topics").delete();
+    if (res.error) throw res.error;
+  
+    // 4. Areas
+    res = await supabase.from("areas").delete();
+    if (res.error) throw res.error;
+  
+    // 5. Teams
+    res = await supabase.from("teams").delete();
+    if (res.error) throw res.error;
+  },
+  
+
   async replaceAllWithSnapshot(snapshot: AppState): Promise<void> {
     const { teams, areas, topics, logs } = snapshot;
-
-    // 1. Alles Bestehende für diesen User löschen
-    // ggf. nach user_id filtern, wenn du ein user_id Feld hast
-    await supabase.from("topic_areas").delete().neq("topic_id", "");
-    await supabase.from("request_logs").delete().neq("topic_id", "");
-    await supabase.from("topics").delete().neq("id", "");
-    await supabase.from("areas").delete().neq("id", "");
-    await supabase.from("teams").delete().neq("id", "");
-
-    // 2. Teams einfügen
-    if (teams.length) {
-      const teamRows = teams.map((t) => ({
-        id: t.id,
+  
+    // 1. Alles Alte weg
+    await dataStore.deleteAllForUser();
+  
+    // 2. Teams neu anlegen
+    const teamIdMap = new Map<string, string>();
+    for (const t of teams) {
+      const created = await dataStore.addTeam({
         name: t.name,
         owner: t.owner ?? "",
-      }));
-      const { error } = await supabase.from("teams").insert(teamRows);
-      if (error) throw error;
+      });
+      teamIdMap.set(t.id, created.id);
     }
-
-    // 3. Areas einfügen
-    if (areas.length) {
-      const areaRows = areas.map((a) => ({
-        id: a.id,
+  
+    // 3. Areas neu anlegen
+    const areaIdMap = new Map<string, string>();
+    for (const a of areas) {
+      const created = await dataStore.addArea({
         name: a.name,
         contact: a.contact ?? "",
-      }));
-      const { error } = await supabase.from("areas").insert(areaRows);
-      if (error) throw error;
-    }
-
-    // 4. Topics einfügen
-    if (topics.length) {
-      const topicRows = topics.map((t) => ({
-        id: t.id,
-        ...mapTopicToDb(t),
-      }));
-      const { error } = await supabase.from("topics").insert(topicRows);
-      if (error) throw error;
-    }
-
-    // 5. topic_areas aus Topic.areaIds aufbauen
-    const joinRows: { topic_id: string; area_id: string }[] = [];
-    topics.forEach((t) => {
-      const ids = parseAreaIds(t.areaIds);
-      ids.forEach((areaId) => {
-        joinRows.push({ topic_id: t.id, area_id: areaId });
       });
-    });
-    if (joinRows.length) {
-      const { error } = await supabase.from("topic_areas").insert(joinRows);
-      if (error) throw error;
+      areaIdMap.set(a.id, created.id);
     }
-
-    // 6. Logs einfügen
-    if (logs.length) {
-      const logRows = logs.map((l) => ({
-        id: l.id,
-        topic_id: l.topicId,
+  
+    // 4. Topics neu anlegen (mit gemappten IDs)
+    const topicIdMap = new Map<string, string>();
+    for (const t of topics) {
+      // alte areaIds → neue areaIds über areaIdMap mappen
+      const oldAreaIds = (t.areaIds || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+  
+      const newAreaIds = oldAreaIds
+        .map((oldId) => areaIdMap.get(oldId))
+        .filter((id): id is string => !!id)
+        .join(",");
+  
+      const created = await dataStore.addTopic({
+        teamId: teamIdMap.get(t.teamId)!, // Team muss es geben, sonst war Snapshot inkonsistent
+        title: t.title,
+        description: t.description,
+        cadence: t.cadence,
+        startDate: t.startDate,
+        dueStrategy: t.dueStrategy,
+        dueOffsetDays: t.dueOffsetDays,
+        expectedDeliverable: t.expectedDeliverable,
+        priority: t.priority,
+        status: t.status,
+        tags: t.tags,
+        lastRequestDate: t.lastRequestDate,
+        nextRequestDate: t.nextRequestDate,
+        areaIds: newAreaIds,
+      });
+  
+      topicIdMap.set(t.id, created.id);
+    }
+  
+    // 5. Logs neu anlegen (mit gemappten Topic/Area-IDs)
+    for (const l of logs) {
+      const newTopicId = topicIdMap.get(l.topicId);
+      const newAreaId = areaIdMap.get(l.toAreaId);
+  
+      if (!newTopicId || !newAreaId) {
+        console.warn("Log konnte nicht gemappt werden, wird übersprungen:", l);
+        continue;
+      }
+  
+      await dataStore.addLog({
+        topicId: newTopicId,
+        toAreaId: newAreaId,
         date: l.date,
-        sent_by: l.sentBy,
-        to_area_id: l.toAreaId,
-        notes: l.notes ?? "",
+        sentBy: l.sentBy,
+        notes: l.notes,
         outcome: l.outcome,
-      }));
-      const { error } = await supabase.from("request_logs").insert(logRows);
-      if (error) throw error;
+      });
     }
-  },
-
+  }
 };
