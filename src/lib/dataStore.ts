@@ -37,6 +37,8 @@ export interface DataStore {
   addLog(input: Omit<RequestLog, "id">): Promise<RequestLog>;
   updateLog(log: RequestLog): Promise<RequestLog>;
   deleteLog(id: string): Promise<void>;
+  // JSON Upload
+  replaceAllWithSnapshot(snapshot: AppState): Promise<void>;
 }
 
 // ------------------------------------------------------------------
@@ -572,4 +574,77 @@ export const dataStore: DataStore = {
       .eq("id", id);
     if (res.error) throw res.error;
   },
+
+  async replaceAllWithSnapshot(snapshot: AppState): Promise<void> {
+    const { teams, areas, topics, logs } = snapshot;
+
+    // 1. Alles Bestehende für diesen User löschen
+    // ggf. nach user_id filtern, wenn du ein user_id Feld hast
+    await supabase.from("topic_areas").delete().neq("topic_id", "");
+    await supabase.from("request_logs").delete().neq("topic_id", "");
+    await supabase.from("topics").delete().neq("id", "");
+    await supabase.from("areas").delete().neq("id", "");
+    await supabase.from("teams").delete().neq("id", "");
+
+    // 2. Teams einfügen
+    if (teams.length) {
+      const teamRows = teams.map((t) => ({
+        id: t.id,
+        name: t.name,
+        owner: t.owner ?? "",
+      }));
+      const { error } = await supabase.from("teams").insert(teamRows);
+      if (error) throw error;
+    }
+
+    // 3. Areas einfügen
+    if (areas.length) {
+      const areaRows = areas.map((a) => ({
+        id: a.id,
+        name: a.name,
+        contact: a.contact ?? "",
+      }));
+      const { error } = await supabase.from("areas").insert(areaRows);
+      if (error) throw error;
+    }
+
+    // 4. Topics einfügen
+    if (topics.length) {
+      const topicRows = topics.map((t) => ({
+        id: t.id,
+        ...mapTopicToDb(t),
+      }));
+      const { error } = await supabase.from("topics").insert(topicRows);
+      if (error) throw error;
+    }
+
+    // 5. topic_areas aus Topic.areaIds aufbauen
+    const joinRows: { topic_id: string; area_id: string }[] = [];
+    topics.forEach((t) => {
+      const ids = parseAreaIds(t.areaIds);
+      ids.forEach((areaId) => {
+        joinRows.push({ topic_id: t.id, area_id: areaId });
+      });
+    });
+    if (joinRows.length) {
+      const { error } = await supabase.from("topic_areas").insert(joinRows);
+      if (error) throw error;
+    }
+
+    // 6. Logs einfügen
+    if (logs.length) {
+      const logRows = logs.map((l) => ({
+        id: l.id,
+        topic_id: l.topicId,
+        date: l.date,
+        sent_by: l.sentBy,
+        to_area_id: l.toAreaId,
+        notes: l.notes ?? "",
+        outcome: l.outcome,
+      }));
+      const { error } = await supabase.from("request_logs").insert(logRows);
+      if (error) throw error;
+    }
+  },
+
 };

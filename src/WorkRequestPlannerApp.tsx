@@ -1755,24 +1755,27 @@ function PriorityBadge({ p }: { p: Priority }) {
           return;
         }
 
-        dispatch({ type: "IMPORT_STATE", payload: parsed });
-        toast.error("Daten importiert" );
-      } catch (err) {
-        console.error("JSON-Import-Fehler", err);
-        toast("Import fehlgeschlagen.Die JSON-Datei konnte nicht gelesen werden.");
-      } finally {
-        // Input resetten, damit dieselbe Datei erneut wählbar ist
-        if (jsonFileInputRef.current) {
-          jsonFileInputRef.current.value = "";
-        }
-      }
-    };
-    reader.onerror = () => {
-      toast.error("Lesefehler. Die Datei konnte nicht gelesen werden.");
-    };
+        // 1) Supabase-Snapshot ersetzen
+      await dataStore.replaceAllWithSnapshot(parsed);
 
-    reader.readAsText(file, "utf-8");
+      // 2) Lokalen State synchron halten
+      dispatch({ type: "RESET_FROM_REMOTE", payload: parsed });
+
+      toast.success("Daten importiert und in Supabase gespeichert.");
+    } catch (err) {
+      console.error("JSON-Import-Fehler", err);
+      toast.error("Import fehlgeschlagen. Die JSON-Datei konnte nicht verarbeitet werden.");
+    } finally {
+      if (jsonFileInputRef.current) {
+        jsonFileInputRef.current.value = "";
+      }
+    }
   };
+  reader.onerror = () => {
+    toast.error("Lesefehler. Die Datei konnte nicht gelesen werden.");
+  };
+  reader.readAsText(file, "utf-8");
+};
 
   if (loading) {
     return <div className="p-4 text-sm text-muted-foreground">Lade Daten …</div>;
