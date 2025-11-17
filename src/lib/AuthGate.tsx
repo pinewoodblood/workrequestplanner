@@ -97,15 +97,6 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   // Angemeldet → App anzeigen + Logout-Button
   return (
     <>
-      <div className="fixed top-2 right-3 text-xs text-slate-500 flex items-center gap-2 z-50">
-        <span>{session.user.email}</span>
-        <button
-          onClick={handleLogout}
-          className="border rounded px-2 py-0.5 hover:bg-slate-100"
-        >
-          Logout
-        </button>
-      </div>
       {children}
     </>
   );
