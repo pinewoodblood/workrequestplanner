@@ -915,8 +915,9 @@ function LogForm({
   const [notes, setNotes] = React.useState("");
   const [outcome, setOutcome] =
     React.useState<RequestLog["outcome"]>("sent");
-
-  return (
+  
+  
+    return (
     <form
       className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto pr-1"
       onSubmit={(e) => {
@@ -1044,7 +1045,7 @@ function PriorityBadge({ p }: { p: Priority }) {
      topics: [],
      logs: [],
    };
-  
+
      
    export default function WorkRequestPlannerAppUX() {
     const [state, dispatch] = React.useReducer(reducer, EMPTY_STATE);
@@ -1141,7 +1142,9 @@ function PriorityBadge({ p }: { p: Priority }) {
       .filter(Boolean)
       .some((id) => !state.areas.find((a) => a.id === id)?.contact);
 
-  function clearFilters() {
+  const [importMode, setImportMode] = React.useState<"append" | "truncateAll">("append");
+  
+      function clearFilters() {
     setQuery("");
     setFltTeam("all");
     setFltArea("all");
@@ -1750,14 +1753,16 @@ function PriorityBadge({ p }: { p: Priority }) {
         // optional: Nachfrage, ob wirklich alles ersetzt werden soll
         if (
           !window.confirm(
-            "Bestehende Daten durch die importierte JSON-Datei ersetzen?"
+            importMode === "append"
+            ? "JSON wird zu bestehenden Daten hinzugefügt. Fortfahren?"
+            : "Bestehende Daten durch die importierte JSON-Datei ersetzen?"
           )
         ) {
           return;
         }
 
-        // 1) Supabase-Snapshot ersetzen
-      await dataStore.replaceAllWithSnapshot(parsed);
+         // ⭐ WICHTIG: hier wird jetzt der Modus übergeben!
+         await dataStore.replaceAllWithSnapshot(parsed, importMode);
 
       // 2) Lokalen State synchron halten
       dispatch({ type: "RESET_FROM_REMOTE", payload: parsed });
@@ -3275,6 +3280,59 @@ function PriorityBadge({ p }: { p: Priority }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Import Dialog */}
+<Dialog open={openImportDialog} onOpenChange={setOpenImportDialog}>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>Daten importieren</DialogTitle>
+      <DialogDescription>
+        Lade eine JSON-Datei hoch, um Daten zu importieren.
+      </DialogDescription>
+    </DialogHeader>
+
+    {/* Import-Modus-Auswahl */}
+    <div className="mt-4">
+      <label className="font-medium">Import-Modus:</label>
+      <div className="flex gap-4 mt-2">
+        <label className="flex items-center gap-2">
+          <input
+            type="radio"
+            checked={importMode === "append"}
+            onChange={() => setImportMode("append")}
+          />
+          <span>Anhängen</span>
+        </label>
+
+        <label className="flex items-center gap-2">
+          <input
+            type="radio"
+            checked={importMode === "truncateAll"}
+            onChange={() => setImportMode("truncateAll")}
+          />
+          <span>Alles löschen + importieren</span>
+        </label>
+      </div>
+    </div>
+
+    {/* Datei auswählen */}
+    <div className="mt-4">
+      <input
+        type="file"
+        accept="application/json"
+        ref={jsonFileInputRef}
+        onChange={handleJsonFileChange}
+      />
+    </div>
+
+    <DialogFooter>
+      <Button variant="outline" onClick={() => setOpenImportDialog(false)}>
+        Abbrechen
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+
 
       {/* Detail Sheet */}
       <Sheet

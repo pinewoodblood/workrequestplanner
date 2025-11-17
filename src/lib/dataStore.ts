@@ -42,7 +42,10 @@ export interface DataStore {
    deleteAllForUser(): Promise<void>;
   
   // JSON Upload
-  replaceAllWithSnapshot(snapshot: AppState): Promise<void>;
+  replaceAllWithSnapshot(
+    snapshot: AppState,
+    mode?: "append" | "truncateAll"
+  ): Promise<void>;
 }
 
 // ------------------------------------------------------------------
@@ -579,41 +582,42 @@ export const dataStore: DataStore = {
     if (res.error) throw res.error;
   },
 
+  
   async deleteAllForUser(): Promise<void> {
-    // Wenn du RLS mit user_id = auth.uid() nutzt UND bereits Supabase Auth im Frontend,
-    // kannst du hier optional noch explizit nach user_id filtern.
-    //
-    // In den meisten Fällen reicht es, einfach delete() aufzurufen – 
-    // RLS sorgt dann dafür, dass nur die Zeilen des aktuellen Users gelöscht werden.
+    const { data, error } = await supabase.auth.getUser();
+    if (error || !data?.user) {
+      throw new Error("Kein eingeloggter Benutzer – deleteAllForUser abgebrochen.");
+    }
+    const uid = data.user.id;
   
-    // Reihenfolge ist wichtig wegen Foreign Keys:
-    // 1. Joins
-    let res = await supabase.from("topic_areas").delete();
+    let res;
+  
+    res = await supabase.from("topic_areas").delete().eq("user_id", uid);
     if (res.error) throw res.error;
   
-    // 2. Logs
-    res = await supabase.from("request_logs").delete();
+    res = await supabase.from("request_logs").delete().eq("user_id", uid);
     if (res.error) throw res.error;
   
-    // 3. Topics
-    res = await supabase.from("topics").delete();
+    res = await supabase.from("topics").delete().eq("user_id", uid);
     if (res.error) throw res.error;
   
-    // 4. Areas
-    res = await supabase.from("areas").delete();
+    res = await supabase.from("areas").delete().eq("user_id", uid);
     if (res.error) throw res.error;
   
-    // 5. Teams
-    res = await supabase.from("teams").delete();
+    res = await supabase.from("teams").delete().eq("user_id", uid);
     if (res.error) throw res.error;
   },
-  
 
-  async replaceAllWithSnapshot(snapshot: AppState): Promise<void> {
+  async replaceAllWithSnapshot(
+    snapshot: AppState,
+    mode: "append" | "truncateAll" = "append"
+  ): Promise<void> {
     const { teams, areas, topics, logs } = snapshot;
   
-    // 1. Alles Alte weg
-    await dataStore.deleteAllForUser();
+    if (mode === "truncateAll") {
+      await dataStore.deleteAllForUser(); // ⬅ hiermit wird jetzt mit WHERE gelöscht
+    }
+  
   
     // 2. Teams neu anlegen
     const teamIdMap = new Map<string, string>();
