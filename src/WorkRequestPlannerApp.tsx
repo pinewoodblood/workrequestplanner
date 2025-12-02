@@ -110,7 +110,7 @@ import { dataStore } from "./lib/dataStore";
    =========================================================== */
 
 type Cadence = "one-off" | "weekly" | "monthly" | "quarterly" | "yearly";
-type DueStrategy = "fixed-date" | "relative";
+type DueStrategy = "fixed-date" | "offset-from-start" | "offset-from-last";
 type Priority = "low" | "medium" | "high";
 type Status = "planned" | "active" | "blocked" | "done";
 
@@ -232,59 +232,80 @@ const STR = {
    Helpers: IDs, Dates, Cadence
    =========================================================== */
 
-const uid = () => Math.random().toString(36).slice(2, 10);
+   function getDue(t: Topic): string | undefined {
+    // Priorität: nächste Fälligkeit, sonst Startdatum
+    return t.nextRequestDate ?? t.startDate ?? undefined;
+  }  
 
-function addDaysISO(iso: string, days: number) {
-  const d = new Date(iso + "T00:00:00");
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-}
+   const uid = () => Math.random().toString(36).slice(2, 10);
 
-function cadenceNextDate(
-  startISO: string,
-  cadence?: Cadence,
-  lastISO?: string
-): string | undefined {
-  if (!startISO || !cadence) return undefined;
-  if (cadence === "one-off") return startISO;
-  const baseISO = lastISO || startISO;
-  const d = new Date(baseISO + "T00:00:00");
-  switch (cadence) {
-    case "weekly":
-      d.setDate(d.getDate() + 7);
-      break;
-    case "monthly":
-      d.setMonth(d.getMonth() + 1);
-      break;
-    case "quarterly":
-      d.setMonth(d.getMonth() + 3);
-      break;
-    case "yearly":
-      d.setFullYear(d.getFullYear() + 1);
-      break;
-    default:
-      break;
-  }
-  return d.toISOString().slice(0, 10);
-}
-
-function isOverdue(iso?: string) {
-  if (!iso) return false;
-  const today = new Date().toISOString().slice(0, 10);
-  return iso < today;
-}
-
-function isDueToday(iso?: string) {
-  if (!iso) return false;
-  const today = new Date().toISOString().slice(0, 10);
-  return iso === today;
-}
-
-function getDue(t: Topic): string | undefined {
-  return t.nextRequestDate ?? t.startDate ?? undefined;
-}
-
-// Hilfsfunktion: führt Arrays nach ID zusammen
+   // NEU: lokale ISO-Helfer (YYYY-MM-DD ohne Zeitzonen-Stress)
+   function parseLocalISODate(iso: string): Date {
+     const [y, m, d] = iso.split("-").map(Number);
+     return new Date(y, m - 1, d);
+   }
+   
+   function formatLocalISODate(date: Date): string {
+     const y = date.getFullYear();
+     const m = String(date.getMonth() + 1).padStart(2, "0");
+     const d = String(date.getDate()).padStart(2, "0");
+     return `${y}-${m}-${d}`;
+   }
+   
+   function todayLocalISO(): string {
+     return formatLocalISODate(new Date());
+   }
+   
+   function addDaysISO(iso: string, days: number) {
+     const d = parseLocalISODate(iso);
+     d.setDate(d.getDate() + days);
+     return formatLocalISODate(d);
+   }
+   
+   function cadenceNextDate(
+     startISO: string,
+     cadence?: Cadence,
+     lastISO?: string
+   ): string | undefined {
+     if (!startISO || !cadence) return undefined;
+     if (cadence === "one-off") return startISO;
+   
+     const baseISO = lastISO || startISO;
+     const d = parseLocalISODate(baseISO);
+   
+     switch (cadence) {
+       case "weekly":
+         d.setDate(d.getDate() + 7);
+         break;
+       case "monthly":
+         d.setMonth(d.getMonth() + 1);
+         break;
+       case "quarterly":
+         d.setMonth(d.getMonth() + 3);
+         break;
+       case "yearly":
+         d.setFullYear(d.getFullYear() + 1);
+         break;
+     }
+   
+     return formatLocalISODate(d);
+   }
+   
+   function isOverdue(iso?: string) {
+     if (!iso) return false;
+     const today = todayLocalISO();
+     return iso < today;
+   }
+   
+   function isDueToday(iso?: string) {
+     if (!iso) return false;
+     return iso === todayLocalISO();
+   }
+   
+/* ===========================================================
+   // Helper: Arrays nach ID zusammenführen
+   =========================================================== */
+   
 function mergeById<T extends { id: string }>(existing: T[], incoming: T[]): T[] {
   const map = new Map<string, T>();
 
@@ -293,7 +314,8 @@ function mergeById<T extends { id: string }>(existing: T[], incoming: T[]): T[] 
 
   return Array.from(map.values());
 }
- 
+
+
 /* ===========================================================
    State / Reducer / Persist
    =========================================================== */
@@ -1434,47 +1456,62 @@ function PriorityBadge({ p }: { p: Priority }) {
         .filter(Boolean)
         .join(",");
   
-    if (existing) {
-      // UPDATE
-      const localTopic: Topic = {
-        ...existing,
-        title: draft.title!.trim(),
-        teamId: draft.teamId!,
-        areaIds,
-        expectedDeliverable:
-          draft.expectedDeliverable ?? existing.expectedDeliverable,
-        priority: (draft.priority as Priority) ?? existing.priority,
-        status: (draft.status as Status) ?? existing.status,
-        cadence: (draft.cadence as Cadence) ?? existing.cadence,
-        dueStrategy:
-          (draft.dueStrategy as Topic["dueStrategy"]) ?? existing.dueStrategy,
-        dueOffsetDays: draft.dueOffsetDays ?? existing.dueOffsetDays,
-        startDate: draft.startDate ?? existing.startDate,
-        tags: draft.tags ?? existing.tags,
-        lastRequestDate: draft.lastRequestDate ?? existing.lastRequestDate,
-        nextRequestDate:
-          draft.nextRequestDate ??
-          existing.nextRequestDate ??
-          cadenceNextDate(
-            draft.startDate ?? existing.startDate!,
-            (draft.cadence as Cadence) ?? existing.cadence!,
-            draft.lastRequestDate ?? existing.lastRequestDate
-          ),
-      };
-  
-      dispatch({ type: "UPDATE_TOPIC", topic: localTopic });
-  
-      try {
-        const updated = await dataStore.updateTopic(localTopic);
-        dispatch({ type: "UPDATE_TOPIC", topic: updated });
-        toast.success("Thema aktualisiert");
-      } catch (e) {
-        console.error("Fehler beim Speichern des Themas in Supabase:", e);
-        toast.error("Thema lokal gespeichert, aber nicht im Backend.");
-      } finally {
-        setOpenTopicDialog(false);
-      }
-    } else {
+        if (existing) {
+          const updatedStartDate = draft.startDate ?? existing.startDate;
+          const updatedCadence   = (draft.cadence as Cadence) ?? existing.cadence;
+          const updatedLastReq   = draft.lastRequestDate ?? existing.lastRequestDate;
+        
+          // hat sich etwas geändert?
+          const startChanged   = draft.startDate  !== undefined && draft.startDate  !== existing.startDate;
+          const cadenceChanged = draft.cadence    !== undefined && draft.cadence    !== existing.cadence;
+        
+          let nextRequestDate = existing.nextRequestDate;
+        
+          // wenn Startdatum oder Frequenz geändert wurden ODER bisher keine nächste Fälligkeit existiert:
+          if (
+            (updatedStartDate && updatedCadence && (startChanged || cadenceChanged)) ||
+            !nextRequestDate
+          ) {
+            nextRequestDate = cadenceNextDate(
+              updatedStartDate!,
+              updatedCadence,
+              updatedLastReq
+            );
+          }
+        
+          const localTopic: Topic = {
+            ...existing,
+            title: draft.title!.trim(),
+            teamId: draft.teamId!,
+            areaIds,
+            expectedDeliverable:
+              draft.expectedDeliverable ?? existing.expectedDeliverable,
+            priority: (draft.priority as Priority) ?? existing.priority,
+            status: (draft.status as Status) ?? existing.status,
+            cadence: updatedCadence,
+            dueStrategy:
+              (draft.dueStrategy as Topic["dueStrategy"]) ?? existing.dueStrategy,
+            dueOffsetDays: draft.dueOffsetDays ?? existing.dueOffsetDays,
+            startDate: updatedStartDate,
+            tags: draft.tags ?? existing.tags,
+            lastRequestDate: updatedLastReq,
+            nextRequestDate,
+          };
+        
+          dispatch({ type: "UPDATE_TOPIC", topic: localTopic });
+        
+          try {
+            const updated = await dataStore.updateTopic(localTopic);
+            dispatch({ type: "UPDATE_TOPIC", topic: updated });
+            toast.success("Thema aktualisiert");
+          } catch (e) {
+            console.error("Fehler beim Speichern des Themas in Supabase:", e);
+            toast.error("Thema lokal gespeichert, aber nicht im Backend.");
+          } finally {
+            setOpenTopicDialog(false);
+          }
+        }      
+        else {
       // CREATE
       const commons: Omit<Topic, "id"> = {
         teamId: draft.teamId!,
@@ -1488,13 +1525,13 @@ function PriorityBadge({ p }: { p: Priority }) {
           (draft.dueStrategy as Topic["dueStrategy"]) ?? "fixed-date",
         dueOffsetDays: draft.dueOffsetDays,
         startDate:
-          draft.startDate || new Date().toISOString().slice(0, 10),
+          draft.startDate || todayLocalISO(),
         tags: draft.tags ?? "",
         lastRequestDate: draft.lastRequestDate,
         nextRequestDate:
           draft.nextRequestDate ??
           cadenceNextDate(
-            draft.startDate || new Date().toISOString().slice(0, 10),
+            draft.startDate || todayLocalISO(),
             (draft.cadence as Cadence) ?? "one-off",
             draft.lastRequestDate
           ),
@@ -1544,7 +1581,7 @@ function PriorityBadge({ p }: { p: Priority }) {
     const logInput: Omit<RequestLog, "id"> = {
       topicId: l.topicId!,
       toAreaId: l.toAreaId!,
-      date: l.date || new Date().toISOString().slice(0, 10),
+      date: l.date || todayLocalISO(),
       sentBy: l.sentBy || "Unbekannt",
       notes: l.notes || "",
       outcome: (l.outcome as any) || "sent",
@@ -1633,7 +1670,7 @@ function PriorityBadge({ p }: { p: Priority }) {
   /* ---- KPIs ---- */
 
   const kpi = React.useMemo(() => {
-    const todayISO = new Date().toISOString().slice(0, 10);
+    const todayISO = todayLocalISO();
     const inDays = (n: number) => addDaysISO(todayISO, n);
 
     let next7 = 0;
@@ -1668,7 +1705,7 @@ function PriorityBadge({ p }: { p: Priority }) {
         });
       perTeam[t.teamId] = (perTeam[t.teamId] || 0) + 1;
 
-      const d = new Date(due + "T00:00:00");
+      const d = parseLocalISODate(due);
       const key = `${String(d.getMonth() + 1).padStart(2, "0")}.${String(
         d.getFullYear()
       ).slice(-2)}`;
@@ -1683,7 +1720,7 @@ function PriorityBadge({ p }: { p: Priority }) {
     // alle Filter zurücksetzen
     clearFilters();
   
-    const todayISO = new Date().toISOString().slice(0, 10);
+    const todayISO = todayLocalISO();
     // "Gestern" = heute - 1 Tag
     const yesterdayISO = addDaysISO(todayISO, -1);
   
@@ -1700,7 +1737,7 @@ function PriorityBadge({ p }: { p: Priority }) {
   function jumpToTopicsNext7() {
     clearFilters();
   
-    const todayISO = new Date().toISOString().slice(0, 10);
+    const todayISO = todayLocalISO();
     const toISO = addDaysISO(todayISO, 7);
   
     setFltFrom(todayISO);
@@ -1712,7 +1749,7 @@ function PriorityBadge({ p }: { p: Priority }) {
   function jumpToTopicsNext30() {
     clearFilters();
   
-    const todayISO = new Date().toISOString().slice(0, 10);
+    const todayISO = todayLocalISO();
     const toISO = addDaysISO(todayISO, 30);
   
     setFltFrom(todayISO);
@@ -1732,13 +1769,13 @@ function PriorityBadge({ p }: { p: Priority }) {
     for (let i = 0; i < firstWeekday; i++) {
       const d = new Date(first);
       d.setDate(first.getDate() - (firstWeekday - i));
-      const iso = d.toISOString().slice(0, 10);
+      const iso = formatLocalISODate(d);
       days.push({ date: d, iso, items: [] });
     }
     const last = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
     for (let day = 1; day <= last.getDate(); day++) {
       const d = new Date(cursor.getFullYear(), cursor.getMonth(), day);
-      const iso = d.toISOString().slice(0, 10);
+      const iso = formatLocalISODate(d);
       days.push({
         date: d,
         iso,
@@ -1748,7 +1785,7 @@ function PriorityBadge({ p }: { p: Priority }) {
     while (days.length % 7 !== 0) {
       const d = new Date(days[days.length - 1].date);
       d.setDate(d.getDate() + 1);
-      const iso = d.toISOString().slice(0, 10);
+      const iso = formatLocalISODate(d);
       days.push({ date: d, iso, items: [] });
     }
     return days;
